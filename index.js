@@ -1,20 +1,27 @@
-const express = require('express')
-const app = express()
-const port = process.env.PORT || 3000
+require('dotenv').config();
 
-var LoremIpsum = require('lorem-ipsum').LoremIpsum;
+const express = require('express');
+const cors = require('cors');
+const app = express();
+const port = process.env.PORT || 5000;
 
-var lorem = new LoremIpsum({
-  sentencesPerParagraph: {
-    max: 8,
-    min: 4
-  },
-  wordsPerSentence: {
-    max: 16,
-    min: 4
-  }
+const tokenPricesRoute = require('./routes/tokenPrices');
+const aiSearchRoute = require('./routes/aiSearch');
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// API Routes
+app.use('/api/token-prices', tokenPricesRoute);
+app.use('/api/ai-search', aiSearchRoute);
+
+// Optional test route
+app.get('/', (req, res) => {
+  res.send('FractionaX Backend API is live ✅');
 });
 
-app.get('/', (req, res) => res.send(lorem.generateParagraphs(7)))
-
-app.listen(port, () => console.log(`Example app listening on port ${port}!`))
+// Start server
+app.listen(port, () => {
+  console.log(`🚀 Server running at http://localhost:${port}`);
+});
