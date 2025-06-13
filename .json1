@@ -1,0 +1,77 @@
+# Let's generate a few sample .jsonl training entries for the AI assistant based on enriched schema
+
+import json
+
+# Define enriched examples based on user queries
+training_examples = [
+    {
+        "messages": [
+            {"role": "user", "content": "Find me a 3 bedroom house in Houston under $400k, near a Whole Foods, in a safe area with good schools."},
+            {"role": "assistant", "content": json.dumps({
+                "property_type": "house",
+                "city": "Houston",
+                "min_beds": 3,
+                "max_price": 400000,
+                "keyword": "Whole Foods",
+                "school_rating": 8.5,
+                "crime_score": 3.2,
+                "flood_zone": "X",
+                "estimated_rent": 2600,
+                "cap_rate": 7.8,
+                "estimated_insurance_cost": 1200,
+                "energy_efficiency_rating": "B+",
+                "foot_traffic_score": 82,
+                "watchlist_count": 142,
+                "fractionax_score": 91.7
+            })}
+        ]
+    },
+    {
+        "messages": [
+            {"role": "user", "content": "I'm looking for a high-yield rental near Rice University under $300K with low flood risk and strong retail activity."},
+            {"role": "assistant", "content": json.dumps({
+                "property_type": "rental",
+                "city": "Houston",
+                "max_price": 300000,
+                "keyword": "Rice University",
+                "school_rating": 9.1,
+                "crime_score": 4.0,
+                "flood_zone": "X",
+                "estimated_rent": 2400,
+                "cap_rate": 9.3,
+                "foot_traffic_score": 88,
+                "retail_demand_index": 92,
+                "estimated_insurance_cost": 980,
+                "watchlist_count": 95,
+                "fractionax_score": 93.4
+            })}
+        ]
+    },
+    {
+        "messages": [
+            {"role": "user", "content": "Show me a vacation home with ocean view, low insurance costs, and walkable retail under $600K."},
+            {"role": "assistant", "content": json.dumps({
+                "property_type": "vacation",
+                "city": "Galveston",
+                "max_price": 600000,
+                "view": "ocean",
+                "flood_zone": "AE",
+                "estimated_insurance_cost": 1400,
+                "foot_traffic_score": 75,
+                "retail_demand_index": 85,
+                "walkability_score": 80,
+                "cap_rate": 6.5,
+                "watchlist_count": 110,
+                "fractionax_score": 88.1
+            })}
+        ]
+    }
+]
+
+# Save as .jsonl file
+file_path = "/mnt/data/fractionax_enriched_training_data.jsonl"
+with open(file_path, "w") as f:
+    for example in training_examples:
+        f.write(json.dumps(example) + "\n")
+
+file_path
