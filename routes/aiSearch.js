@@ -44,12 +44,14 @@ router.post("/", async (req, res) => {
   }
 
   const {
-    city = parsedFilter.location || "Houston",
-    zip_code = parsedFilter.zip_code || "77024",
-    max_price = parsedFilter.max_price || "500000",
-    min_beds = parsedFilter.min_beds || "1",
-    property_type = parsedFilter.property_type || "Houses",
-  } = parsedFilter;
+  city = parsedFilter.location || "Houston",
+  zip_code = parsedFilter.zip_code || "77024",
+  min_beds = parsedFilter.min_beds || "1",
+  property_type = parsedFilter.property_type || "Houses",
+} = parsedFilter;
+
+const max_price = Number(parsedFilter.max_price) || 150000;
+
 
   // 🔍 Zillow API
   const zillowParams = new URLSearchParams({
@@ -70,12 +72,13 @@ router.post("/", async (req, res) => {
     },
   });
 
-  const zillowData = await zillowResponse.json();
+ const zillowData = await zillowResponse.json();
 
-  // 📍 Use first property to extract coordinates
-  const firstListing = zillowData.props?.[0];
-  const lat = firstListing?.latitude || "29.7604";
-  const lon = firstListing?.longitude || "-95.3698";
+const rawListings = zillowData.props || [];
+const filteredListings = rawListings.filter(
+  (p) => Number(p.price) > 0 && Number(p.price) <= max_price
+);
+
 
   // 🏠 Attom API
   const attomUrl = `https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/detail?postalcode=${zip_code}&city=${encodeURIComponent(city)}`;
@@ -89,18 +92,23 @@ router.post("/", async (req, res) => {
 
   const attomData = await attomResponse.json();
 
+  // 📍 Coordinates for GreatSchools
+  const firstListing = rawListings[0];
+  const lat = firstListing?.latitude || "29.7604";
+  const lon = firstListing?.longitude || "-95.3698";
+
   // 🏫 GreatSchools API
   let schoolData = {};
   try {
     const schoolUrl = `https://api.greatschools.org/schools/nearby?key=${process.env.GS_API_KEY}&state=TX&lat=${lat}&lon=${lon}&limit=3`;
     const schoolResponse = await fetch(schoolUrl);
-    const schoolText = await schoolResponse.text(); // GreatSchools responds with XML
-    schoolData = { raw: schoolText }; // For now, just return raw XML until parsed
+    const schoolText = await schoolResponse.text(); // XML
+    schoolData = { raw: schoolText };
   } catch (err) {
     console.warn("⚠️ Failed to fetch school data:", err.message);
   }
 
-  // 🧠 Summary using OpenAI (optional, skip if you want to reduce tokens)
+  // 🧠 Optional: Summary
   let aiSummary = "";
   try {
     const summaryResponse = await openai.chat.completions.create({
@@ -116,10 +124,10 @@ router.post("/", async (req, res) => {
     console.warn("⚠️ Summary generation failed:", err.message);
   }
 
-  // ✅ Final Response
+  // ✅ Final response
   return res.status(200).json({
     filters: parsedFilter,
-    listings: zillowData,
+    listings: filteredListings,
     attom_data: attomData,
     schools: schoolData,
     ai_summary: aiSummary,
