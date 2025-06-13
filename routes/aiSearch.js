@@ -7,51 +7,57 @@ require("dotenv").config();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 router.post("/", async (req, res) => {
-    const { query } = req.body;
-    let completion;
+  const { query } = req.body;
+  let completion;
 
-    try {
-        completion = await openai.chat.completions.create({
-            model: "ft:gpt-3.5-turbo-0125:fractionax::BhqIG5Uh",
-            messages: [
-                { role: "system", content: "You are a smart real estate assistant." },
-                { role: "user", content: "Find me a house in Houston with good schools and low crime under $350k" },
+  if (!query || typeof query !== "string") {
+    return res.status(400).json({ error: "Missing or invalid query" });
+  }
 
-            ],
-        });
-    } catch (err) {
-        console.warn("⚠️ Fine-tuned model failed, falling back to base GPT:", err.message);
-        completion = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
-            messages: [
-                { role: "system", content: "You are a smart real estate assistant. Return structured JSON with clear city names or ZIP codes." },
-                { role: "user", content: query },
-            ],
-        });
-    }
+  try {
+    completion = await openai.chat.completions.create({
+      model: "ft:gpt-3.5-turbo-0125:fractionax::BhqIG5Uh",
+      messages: [
+        { role: "system", content: "You are a smart real estate assistant." },
+        { role: "user", content: query }, // ✅ dynamic input
+      ],
+    });
+  } catch (err) {
+    console.warn("⚠️ Fine-tuned model failed, falling back to base GPT:", err.message);
+    completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        { role: "system", content: "You are a smart real estate assistant. Return structured JSON with clear city names or ZIP codes." },
+        { role: "user", content: query },
+      ],
+    });
+  }
 
-    const aiResponse = completion.choices[0].message.content?.trim();
-    let parsedFilter = {};
+  const aiResponse = completion.choices[0].message.content?.trim();
+  let parsedFilter = {};
 
-    try {
-        const jsonStart = aiResponse.indexOf("{");
-        const jsonEnd = aiResponse.lastIndexOf("}");
-        const cleanJson = aiResponse.substring(jsonStart, jsonEnd + 1);
-        parsedFilter = JSON.parse(cleanJson);
-    } catch (err) {
-        console.error("❌ Failed to parse JSON from AI response:", aiResponse);
-        return res.status(400).json({ error: "Invalid format returned by model" });
-    }
+  try {
+    const jsonStart = aiResponse.indexOf("{");
+    const jsonEnd = aiResponse.lastIndexOf("}");
+    const cleanJson = aiResponse.substring(jsonStart, jsonEnd + 1);
+    parsedFilter = JSON.parse(cleanJson);
+  } catch (err) {
+    console.error("❌ Failed to parse JSON from AI response:", aiResponse);
+    return res.status(400).json({ error: "Invalid format returned by model" });
+  }
 
-    const originalCity = parsedFilter.location || parsedFilter.city || "Houston";
-    const normalizedCity = (originalCity.toLowerCase().includes("downtown") || originalCity.length < 3)
-        ? "Houston"
-        : originalCity;
-    const zip_code = parsedFilter.zip_code || "77024";
-    const max_price = Number(parsedFilter.max_price) || 150000;
-    const min_beds = parsedFilter.min_beds || "1";
-    const property_type = parsedFilter.property_type || "Houses";
+  const originalCity = parsedFilter.location || parsedFilter.city || "Houston";
+  const normalizedCity =
+    originalCity.toLowerCase().includes("downtown") || originalCity.length < 3
+      ? "Houston"
+      : originalCity;
 
+  const zip_code = parsedFilter.zip_code || "77024";
+  const max_price = Number(parsedFilter.max_price) || 150000;
+  const min_beds = parsedFilter.min_beds || "1";
+  const property_type = parsedFilter.property_type || "Houses";
+
+  
     // 🔍 Zillow API
     const zillowParams = new URLSearchParams({
         location: normalizedCity,
