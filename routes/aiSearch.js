@@ -12,7 +12,7 @@ router.post("/", async (req, res) => {
 
     try {
         completion = await openai.chat.completions.create({
-            model: "ft:gpt-3.5-turbo-0125:your-org::model-id",
+            model: "ft:gpt-3.5-turbo-0125:fractionax::BhqIG5Uh",
             messages: [
                 { role: "system", content: "You are a smart real estate assistant." },
                 { role: "user", content: "Find me a rental in Houston under $300k" },
