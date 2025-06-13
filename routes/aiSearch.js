@@ -15,7 +15,8 @@ router.post("/", async (req, res) => {
             model: "ft:gpt-3.5-turbo-0125:fractionax::BhqIG5Uh",
             messages: [
                 { role: "system", content: "You are a smart real estate assistant." },
-                { role: "user", content: "Find me a rental in Houston under $300k" },
+                { role: "user", content: "Find me a house in Houston with good schools and low crime under $350k" },
+
             ],
         });
     } catch (err) {
