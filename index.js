@@ -45,6 +45,7 @@ app.use(
 );
 
 // ✅ Rate limiter after session (optional)
+app.set("trust proxy", 1); // trust first proxy
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
