@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const attom = require('../attom'); // Adjust path if needed
+const attom = require('../utils/attom'); // ✅ correct path to attom.js 
 
 // POST /api/attom-data
 // Request body: { address, zip_code, data_required: ["flood", "crime", "avm", etc.] }
