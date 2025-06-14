@@ -5,19 +5,10 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
-const attomRoutes = require('./routes/attomData');
-const aiPipelineRoute = require('./routes/aiPipeline');
-const session = require("express-session");
-const sessionHistoryRoute = require('./routes/sessionHistory');
-
+const session = require("express-session"); // ✅ Add this
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-
-// 🔗 Import existing routes
-const tokenPricesRoute = require('./routes/tokenPrices');
-const aiSearchRoute = require('./routes/aiSearch');
-const schoolInfoRoute = require('./routes/schoolInfo');
 
 // 🔐 CORS Configuration
 const allowedOrigins = ['http://localhost:3000', 'https://fractionax.io'];
@@ -33,14 +24,27 @@ const corsOptions = {
   credentials: true,
 };
 
-// 🚀 Middleware Setup
+// ✅ Middleware
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 app.use(helmet());
 app.use(express.json());
 app.use(morgan("combined"));
 
-// 📉 Rate Limiting
+// ✅ Add session middleware BEFORE routes
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "fractionax-default-secret",
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+      secure: false, // Change to true if using HTTPS
+      maxAge: 1000 * 60 * 60 // 1 hour
+    }
+  })
+);
+
+// ✅ Rate limiter after session (optional)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -49,29 +53,26 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+// ✅ Import routes
+const tokenPricesRoute = require('./routes/tokenPrices');
+const aiSearchRoute = require('./routes/aiSearch');
+const schoolInfoRoute = require('./routes/schoolInfo');
+const attomDataRoute = require('./routes/attomData');
+const aiPipelineRoute = require('./routes/aiPipeline');
+
 // ✅ API Routes
 app.use("/api/token-prices", tokenPricesRoute);
 app.use("/api/ai-search", aiSearchRoute);
 app.use("/api/schools", schoolInfoRoute);
-app.use("/api/attom-data", attomRoutes); // 🆕 New route for dynamic Attom fetch
+app.use("/api/attom-data", attomDataRoute);
 app.use("/api/ai-pipeline", aiPipelineRoute);
-app.use("/api/session/history", sessionHistoryRoute);
-
-
 
 // ✅ Health Check
 app.get("/", (req, res) => {
   res.status(200).send("✅ FractionaX Backend API is live");
 });
 
-// 🟢 Start Server
+// ✅ Start Server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
-
-app.use(session({
-  secret: "fractionax_ai_memory_chain",
-  resave: false,
-  saveUninitialized: true,
-  cookie: { secure: false } // set true if using HTTPS
-}));
