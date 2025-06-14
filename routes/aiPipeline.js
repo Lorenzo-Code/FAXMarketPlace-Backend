@@ -56,7 +56,9 @@ router.post('/', async (req, res) => {
     ];
 
     // Step 5: Fetch data from Attom
-    const attomResponse = await axios.post(`${process.env.BASE_API_URL}/api/attom-data`, {
+    const baseUrl = process.env.BASE_API_URL || "http://localhost:5000";
+    const attomResponse = await axios.post(`${baseUrl}/api/attom-data`, {
+
       address: structuredData.address,
       zip_code: structuredData.zip_code,
       data_required: structuredData.data_required || ["basic_profile", "avm"]
