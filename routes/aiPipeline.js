@@ -1,70 +1,75 @@
-const express = require('express');
-const axios = require('axios');
-const { OpenAI } = require('openai');
+const express = require("express");
+const axios = require("axios");
+const { OpenAI } = require("openai");
 
 const router = express.Router();
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// POST /api/ai-pipeline
+const MODEL_ID = "ft:gpt-3.5-turbo-1106:fractionax:fractionax-v2:Bi9tiB78";
+const BASE_API_URL = process.env.BASE_API_URL || "http://localhost:5000";
 
-router.post('/reset', (req, res) => {
+// Clear session memory
+router.post("/reset", (req, res) => {
   req.session.chat_history = [];
-  res.status(200).json({ message: "Session memory cleared." });
+  res.status(200).json({ message: "🧠 Session memory cleared." });
 });
 
-// { prompt: "Find me a house in Houston under $500K with no flood risk and good ROI" }
-router.post('/', async (req, res) => {
+// Main AI pipeline
+router.post("/", async (req, res) => {
   const { prompt } = req.body;
   const sessionId = req.sessionID;
 
-  if (!prompt) return res.status(400).json({ error: "Missing prompt" });
+  if (!prompt) {
+    return res.status(400).json({ error: "❌ Missing prompt." });
+  }
 
   try {
-    // Step 1: Load chat history from session memory (if any)
-    const memoryHistory = req.session.chat_history || [];
+    // 1. Retrieve chat memory (if any)
+    const chatHistory = req.session.chat_history || [];
 
-    // Step 2: Build prompt chain (system + previous + new)
+    // 2. Construct message payload
     const messages = [
       {
         role: "system",
-        content: "You are a smart real estate assistant. Return structured JSON for property searches. Remember previous context unless the user resets it."
+        content: "You are a smart real estate assistant. Return structured JSON for property searches. Remember previous context unless reset."
       },
-      ...memoryHistory,
-      {
-        role: "user",
-        content: prompt
-      }
+      ...chatHistory,
+      { role: "user", content: prompt }
     ];
 
-    // Step 3: Get structured data from fine-tuned model
-    const chatResponse = await openai.chat.completions.create({
-      model: "ft:gpt-3.5-turbo-1106:fractionax:fractionax-v2:Bi9tiB78", // Replace with your actual model ID
+    // 3. Query OpenAI model
+    const completion = await openai.chat.completions.create({
+      model: MODEL_ID,
       messages,
       temperature: 0.3
     });
 
-    const aiMessage = chatResponse.choices[0].message.content;
-    const structuredData = JSON.parse(aiMessage);
+    const assistantReply = completion.choices[0].message.content;
+    const structuredData = JSON.parse(assistantReply);
 
-    // Step 4: Update session memory
+    // 4. Validate model output
+    if (!structuredData.address || !structuredData.zip_code) {
+      return res.status(422).json({
+        error: "❌ Model returned incomplete data (missing address or zip_code)",
+        model_output: structuredData
+      });
+    }
+
+    // 5. Save updated session memory
     req.session.chat_history = [
-      ...memoryHistory,
+      ...chatHistory,
       { role: "user", content: prompt },
-      { role: "assistant", content: aiMessage }
+      { role: "assistant", content: assistantReply }
     ];
 
-    // Step 5: Fetch data from Attom
-    const baseUrl = process.env.BASE_API_URL || "http://localhost:5000";
-    const attomResponse = await axios.post(`${baseUrl}/api/attom-data`, {
-
+    // 6. Forward to Attom API (via internal route)
+    const attomResponse = await axios.post(`${BASE_API_URL}/api/attom-data`, {
       address: structuredData.address,
       zip_code: structuredData.zip_code,
       data_required: structuredData.data_required || ["basic_profile", "avm"]
     });
 
-    // Step 6: Return response
+    // 7. Return final response
     return res.status(200).json({
       session_id: sessionId,
       input_prompt: prompt,
@@ -73,8 +78,11 @@ router.post('/', async (req, res) => {
     });
 
   } catch (err) {
-    console.error("❌ AI Pipeline Error:", err.message);
-    return res.status(500).json({ error: "AI pipeline failed", details: err.message });
+    console.error("❌ AI Pipeline Error:", err.response?.data || err.message);
+    return res.status(500).json({
+      error: "AI pipeline failed",
+      details: err.response?.data || err.message
+    });
   }
 });
 

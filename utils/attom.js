@@ -19,9 +19,13 @@ async function request(endpoint, params) {
     });
     return response.data;
   } catch (error) {
-    console.error(`❌ Error fetching from ${endpoint}:`, error.response?.data || error.message);
-    return { error: `Failed to fetch from ${endpoint}` };
+    console.error("❌ Attom API error:", error.response?.data || error.message);
+    return res.status(400).json({
+      error: "Failed to fetch property details from Attom",
+      details: error.response?.data || error.message
+    });
   }
+
 }
 
 module.exports = {
