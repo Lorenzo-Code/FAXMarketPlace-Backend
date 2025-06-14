@@ -45,17 +45,28 @@ router.post("/", async (req, res) => {
     });
 
     const assistantReply = completion.choices[0].message.content;
-    const structuredData = JSON.parse(assistantReply);
+
+    let structuredData;
+    try {
+      structuredData = JSON.parse(assistantReply);
+    } catch (err) {
+      console.error("❌ Failed to parse assistantReply:", assistantReply);
+      return res.status(422).json({
+        error: "Model returned invalid JSON.",
+        raw_output: assistantReply
+      });
+    }
+
 
     // 4. Validate model output
     if (!structuredData.address || !structuredData.zip_code) {
-      console.log("🧠 Raw OpenAI Output:", aiMessage);
+      console.log("🧠 Raw OpenAI Output:", assistantReply);
       console.log("📦 Parsed JSON:", structuredData);
-      
+
       return res.status(422).json({
         error: "❌ Model returned incomplete data (missing address or zip_code)",
         model_output: structuredData
-        
+
       });
     }
 
