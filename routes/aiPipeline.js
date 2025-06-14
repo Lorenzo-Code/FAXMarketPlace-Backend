@@ -5,7 +5,7 @@ const { OpenAI } = require("openai");
 const router = express.Router();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const MODEL_ID = "ft:gpt-3.5-turbo-1106:fractionax:fractionax-v2:Bi9tiB78";
+const MODEL_ID = "ft:gpt-3.5-turbo-1106:fractionax:fractionax-v3:BiLkkGbl";
 const BASE_API_URL = process.env.BASE_API_URL || "http://localhost:5000";
 
 // Reset memory
@@ -94,10 +94,15 @@ If the user query is vague (e.g. "Downtown condos"), infer and include a valid U
       address: structuredData.address,
       zip_code: structuredData.zip_code,
       data_required: structuredData.data_required || ["basic_profile", "avm"]
+      
     });
 
+    console.log("🤖 Parsed Intent:", structuredData);
+    console.log("🏠 Attom Response:", attomResponse.data);
+    
     // 8. Return final response
     return res.status(200).json({
+
       session_id: sessionId,
       input_prompt: prompt,
       parsed_intent: structuredData,
