@@ -1,25 +1,48 @@
 const axios = require('axios');
 
-async function fetchAttomData(address, zip) {
-  const baseUrl = 'https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/detail';
-  const params = {
-    address,
-    postalcode: zip
-  };
+const BASE_URL = 'https://api.gateway.attomdata.com/propertyapi/v1.0.0';
 
+const headers = {
+  apikey: process.env.ATTOM_API_KEY,
+  Host: 'api.gateway.attomdata.com',
+  'User-Agent': 'FractionaX-Agent/1.0',
+  Accept: 'application/json',
+  'Accept-Encoding': 'gzip, deflate, br',
+  Connection: 'keep-alive'
+};
+
+async function request(endpoint, params) {
   try {
-    const response = await axios.get(baseUrl, {
-      headers: {
-        apikey: process.env.ATTOM_API_KEY
-      },
+    const response = await axios.get(`${BASE_URL}${endpoint}`, {
+      headers,
       params
     });
-
     return response.data;
   } catch (error) {
-    console.error("Error fetching Attom data:", error.response?.data || error.message);
-    return { error: "Failed to fetch property details from Attom." };
+    console.error(`❌ Error fetching from ${endpoint}:`, error.response?.data || error.message);
+    return { error: `Failed to fetch from ${endpoint}` };
   }
 }
 
-module.exports = { fetchAttomData };
+module.exports = {
+  getPropertyDetail: (address, postalcode) =>
+    request('/property/detail', { address, postalcode }),
+
+  getBasicProfile: (address, postalcode) =>
+    request('/property/basicprofile', { address, postalcode }),
+
+  getAssessmentDetail: (address, postalcode) =>
+    request('/assessment/assessmentdetail', { address, postalcode }),
+
+  getSaleHistory: (address, postalcode) =>
+    request('/sales/salehistory', { address, postalcode }),
+
+  getAvmDetail: (address, postalcode) =>
+    request('/avm/detail', { address, postalcode }),
+
+  getFloodData: (address, postalcode) =>
+    request('/flood/detail', { address, postalcode }),
+
+  getCrimeData: (postalcode) =>
+    request('/community/crime', { postalcode })
+};

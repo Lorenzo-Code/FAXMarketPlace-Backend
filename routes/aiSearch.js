@@ -16,7 +16,7 @@ router.post("/", async (req, res) => {
 
   try {
     completion = await openai.chat.completions.create({
-      model: "ft:gpt-3.5-turbo-0125:fractionax::BhqIG5Uh",
+      model: "ft:gpt-3.5-turbo-1106:fractionax:fractionax-v2:Bi9tiB78",
       messages: [
         { role: "system", content: "You are a smart real estate assistant." },
         { role: "user", content: query }, // ✅ dynamic input
