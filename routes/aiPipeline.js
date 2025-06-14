@@ -8,13 +8,13 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const MODEL_ID = "ft:gpt-3.5-turbo-1106:fractionax:fractionax-v2:Bi9tiB78";
 const BASE_API_URL = process.env.BASE_API_URL || "http://localhost:5000";
 
-// Clear session memory
+// Reset memory
 router.post("/reset", (req, res) => {
   req.session.chat_history = [];
   res.status(200).json({ message: "🧠 Session memory cleared." });
 });
 
-// Main AI pipeline
+// AI Pipeline Route
 router.post("/", async (req, res) => {
   const { prompt } = req.body;
   const sessionId = req.sessionID;
@@ -24,20 +24,26 @@ router.post("/", async (req, res) => {
   }
 
   try {
-    // 1. Retrieve chat memory (if any)
+    // 1. Retrieve session memory
     const chatHistory = req.session.chat_history || [];
 
-    // 2. Construct message payload
+    // 2. Construct OpenAI message payload
     const messages = [
       {
         role: "system",
-        content: "You are a smart real estate assistant. Return structured JSON for property searches. Remember previous context unless reset."
+        content: `You are a smart real estate assistant. Always return only valid structured JSON like:
+{
+  "address": "123 Main St",
+  "zip_code": "77002",
+  ...
+}
+If the user query is vague (e.g. "Downtown condos"), infer and include a valid US address and zip code.`
       },
       ...chatHistory,
       { role: "user", content: prompt }
     ];
 
-    // 3. Query OpenAI model
+    // 3. Query OpenAI
     const completion = await openai.chat.completions.create({
       model: MODEL_ID,
       messages,
@@ -57,8 +63,15 @@ router.post("/", async (req, res) => {
       });
     }
 
+    // 4. Apply fallback if address/zip_code missing but location is present
+    if (!structuredData.address && structuredData.location) {
+      structuredData.address = structuredData.location;
+    }
+    if (!structuredData.zip_code) {
+      structuredData.zip_code = "00000"; // Default fallback; you may replace with inferred zip logic
+    }
 
-    // 4. Validate model output
+    // 5. Validate output
     if (!structuredData.address || !structuredData.zip_code) {
       console.log("🧠 Raw OpenAI Output:", assistantReply);
       console.log("📦 Parsed JSON:", structuredData);
@@ -66,25 +79,24 @@ router.post("/", async (req, res) => {
       return res.status(422).json({
         error: "❌ Model returned incomplete data (missing address or zip_code)",
         model_output: structuredData
-
       });
     }
 
-    // 5. Save updated session memory
+    // 6. Save memory
     req.session.chat_history = [
       ...chatHistory,
       { role: "user", content: prompt },
       { role: "assistant", content: assistantReply }
     ];
 
-    // 6. Forward to Attom API (via internal route)
+    // 7. Forward to internal Attom API
     const attomResponse = await axios.post(`${BASE_API_URL}/api/attom-data`, {
       address: structuredData.address,
       zip_code: structuredData.zip_code,
       data_required: structuredData.data_required || ["basic_profile", "avm"]
     });
 
-    // 7. Return final response
+    // 8. Return final response
     return res.status(200).json({
       session_id: sessionId,
       input_prompt: prompt,
