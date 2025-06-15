@@ -51,10 +51,11 @@ If the user query is vague (e.g. "Downtown condos"), infer and include a valid U
     });
 
     const assistantReply = completion.choices[0].message.content;
-
     let structuredData;
+
     try {
       structuredData = JSON.parse(assistantReply);
+      console.log("🤖 Parsed Intent:", structuredData); // ✅ AI intent log
     } catch (err) {
       console.error("❌ Failed to parse assistantReply:", assistantReply);
       return res.status(422).json({
@@ -62,6 +63,7 @@ If the user query is vague (e.g. "Downtown condos"), infer and include a valid U
         raw_output: assistantReply
       });
     }
+
 
     // 4. Apply fallback if address/zip_code missing but location is present
     if (!structuredData.address && structuredData.location) {
@@ -90,24 +92,35 @@ If the user query is vague (e.g. "Downtown condos"), infer and include a valid U
     ];
 
     // 7. Forward to internal Attom API
-    const attomResponse = await axios.post(`${BASE_API_URL}/api/attom-data`, {
-      address: structuredData.address,
+    const { fetchMultipleProperties } = require("../utils/attom");
+
+    const attomResponse = await fetchMultipleProperties({
+      city: structuredData.city,
+      state: structuredData.state,
       zip_code: structuredData.zip_code,
-      data_required: structuredData.data_required || ["basic_profile", "avm"]
-      
+      max_price: structuredData.max_price || 500000,
+      min_beds: structuredData.min_beds || 1
     });
 
-    console.log("🤖 Parsed Intent:", structuredData);
-    console.log("🏠 Attom Response:", attomResponse.data);
-    
-    // 8. Return final response
-    return res.status(200).json({
+    console.log("🏘️ Attom Raw Response:", JSON.stringify(attomResponse, null, 2)); // ✅ view full
+    console.log("🏠 Listings Found:", attomResponse?.property?.length || 0); // ✅ quick count
 
+    // ✅ Add your check and fallback warning here
+    if (!attomResponse.property || attomResponse.property.length === 0) {
+      console.warn("⚠️ No Attom listings found with the given filters.");
+    }
+
+    // 8. Return final response
+    console.log("✅ Returning enriched listings to frontend.");
+    return res.status(200).json({
       session_id: sessionId,
       input_prompt: prompt,
       parsed_intent: structuredData,
-      property_data: attomResponse.data
+      property_data: attomResponse.property || [] // important!
     });
+
+
+
 
   } catch (err) {
     console.error("❌ AI Pipeline Error:", err.response?.data || err.message);
