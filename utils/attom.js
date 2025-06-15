@@ -29,22 +29,48 @@ async function request(endpoint, params = {}) {
 }
 
 // 🏘️ Fetch multiple properties using search-based endpoint
-async function fetchMultipleProperties({ city, state, zip_code, max_price, min_beds = 1 }) {
+async function fetchMultipleProperties({
+  city,
+  state,
+  zip_code,
+  max_price,
+  min_beds = 1,
+  property_type = "sfr",
+  sort = "salestransdate"
+}) {
+  // ✅ Robust sort fallback logic for Attom's picky API
+  let safeSort = sort;
+  const usingPostalOnly = zip_code && !city && !state;
+  const knownBadSorts = ["salestransdate", "price", "distance"];
+
+  if (usingPostalOnly && knownBadSorts.includes(sort)) {
+    safeSort = undefined; // ⛔ REMOVE sort entirely
+    console.warn(`⚠️ Removed sort '${sort}' due to zip-only query. Sort removed for Attom compatibility.`);
+  }
+
+  // ✅ Build request params safely
   const params = {
-    city,
-    state,
-    postalcode: zip_code,
-    propertytype: 'SFR', // or Condo, MultiFamily, etc.
+    propertytype: property_type.toLowerCase(),
     maxsaleamt: max_price || 500000,
     minbeds: min_beds,
     pagesize: 10,
-    sort: 'salestransdate desc'
   };
 
-    console.log("📤 Final Attom Params to Snapshot:", params);
+  if (safeSort) {
+    params.sort = safeSort;
+  }
+
+  if (zip_code) params.postalcode = zip_code;
+  if (city) params.city = city;
+  if (state) params.state = state;
+
+  console.log("📤 Final Attom Params to Snapshot:", params);
 
   return request('/property/snapshot', params);
 }
+
+
+
 
 // 📍 Export all endpoint helpers
 module.exports = {

@@ -57,82 +57,75 @@ router.post("/", async (req, res) => {
   const min_beds = parsedFilter.min_beds || "1";
   const property_type = parsedFilter.property_type || "Houses";
 
-  
-    // 🔍 Zillow API
-    const zillowParams = new URLSearchParams({
-        location: normalizedCity,
-        priceMax: max_price,
-        bedsMin: min_beds,
-        home_type: property_type,
-        status_type: "ForSale",
+
+  // 🔍 Zillow API
+  const zillowParams = new URLSearchParams({
+    location: normalizedCity,
+    priceMax: max_price,
+    bedsMin: min_beds,
+    home_type: property_type,
+    status_type: "ForSale",
+  });
+
+  const zillowUrl = `https://zillow-com1.p.rapidapi.com/propertyExtendedSearch?${zillowParams.toString()}`;
+
+  const zillowResponse = await fetch(zillowUrl, {
+    method: "GET",
+    headers: {
+      "x-rapidapi-key": process.env.RAPIDAPI_KEY,
+      "x-rapidapi-host": "zillow-com1.p.rapidapi.com",
+    },
+  });
+
+  const zillowData = await zillowResponse.json();
+  const rawListings = zillowData.props || [];
+  const filteredListings = rawListings
+    .filter(p => Number(p.price) > 0 && Number(p.price) <= max_price)
+    .map(p => ({
+      ...p,
+      fullAddress:
+        p.address?.streetAddress && p.address?.city && p.address?.zipcode
+          ? `${p.address.streetAddress}, ${p.address.city}, ${p.address.zipcode}`
+          : "Address Not Available",
+    }));
+
+
+  const { getPropertyDetail } = require("../utils/attom");
+
+  const attomData = await getPropertyDetail(parsedFilter.address || "N/A", zip_code);
+
+
+  // 📍 Coordinates for GreatSchools
+  const firstListing = rawListings[0];
+  const lat = firstListing?.latitude || "29.7604";
+  const lon = firstListing?.longitude || "-95.3698";
+
+  // 🏫 GreatSchools API (deprecated for now)
+  let schoolData = { raw: "Deprecated API" };
+
+  // 🧠 AI Summary
+  let aiSummary = "";
+  try {
+    const summaryResponse = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        { role: "system", content: "Summarize the buyer’s preferences from this JSON:" },
+        { role: "user", content: JSON.stringify(parsedFilter) },
+      ],
     });
 
-    const zillowUrl = `https://zillow-com1.p.rapidapi.com/propertyExtendedSearch?${zillowParams.toString()}`;
+    aiSummary = summaryResponse.choices?.[0]?.message?.content || "";
+  } catch (err) {
+    console.warn("⚠️ Summary generation failed:", err.message);
+  }
 
-    const zillowResponse = await fetch(zillowUrl, {
-        method: "GET",
-        headers: {
-            "x-rapidapi-key": process.env.RAPIDAPI_KEY,
-            "x-rapidapi-host": "zillow-com1.p.rapidapi.com",
-        },
-    });
-
-    const zillowData = await zillowResponse.json();
-    const rawListings = zillowData.props || [];
-    const filteredListings = rawListings
-        .filter(p => Number(p.price) > 0 && Number(p.price) <= max_price)
-        .map(p => ({
-            ...p,
-            fullAddress:
-                p.address?.streetAddress && p.address?.city && p.address?.zipcode
-                    ? `${p.address.streetAddress}, ${p.address.city}, ${p.address.zipcode}`
-                    : "Address Not Available",
-        }));
-
-
-    // 🏠 Attom API
-    const attomUrl = `https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/detail?postalcode=${zip_code}&city=${encodeURIComponent(normalizedCity)}`;
-
-    const attomResponse = await fetch(attomUrl, {
-        method: "GET",
-        headers: {
-            apikey: process.env.ATTOM_API_KEY,
-        },
-    });
-
-    const attomData = await attomResponse.json();
-
-    // 📍 Coordinates for GreatSchools
-    const firstListing = rawListings[0];
-    const lat = firstListing?.latitude || "29.7604";
-    const lon = firstListing?.longitude || "-95.3698";
-
-    // 🏫 GreatSchools API (deprecated for now)
-    let schoolData = { raw: "Deprecated API" };
-
-    // 🧠 AI Summary
-    let aiSummary = "";
-    try {
-        const summaryResponse = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
-            messages: [
-                { role: "system", content: "Summarize the buyer’s preferences from this JSON:" },
-                { role: "user", content: JSON.stringify(parsedFilter) },
-            ],
-        });
-
-        aiSummary = summaryResponse.choices?.[0]?.message?.content || "";
-    } catch (err) {
-        console.warn("⚠️ Summary generation failed:", err.message);
-    }
-
-    return res.status(200).json({
-        filters: parsedFilter,
-        listings: filteredListings,
-        attom_data: attomData,
-        schools: schoolData,
-        ai_summary: aiSummary,
-    });
+  return res.status(200).json({
+    filters: parsedFilter,
+    listings: filteredListings,
+    attom_data: attomData,
+    schools: schoolData,
+    ai_summary: aiSummary,
+  });
 });
 
 module.exports = router;

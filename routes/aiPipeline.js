@@ -1,20 +1,17 @@
 const express = require("express");
-const axios = require("axios");
 const { OpenAI } = require("openai");
+const { fetchMultipleProperties } = require("../utils/attom");
 
 const router = express.Router();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const MODEL_ID = "ft:gpt-3.5-turbo-1106:fractionax:fractionax-v3:BiLkkGbl";
-const BASE_API_URL = process.env.BASE_API_URL || "http://localhost:5000";
 
-// Reset memory
 router.post("/reset", (req, res) => {
   req.session.chat_history = [];
   res.status(200).json({ message: "🧠 Session memory cleared." });
 });
 
-// AI Pipeline Route
 router.post("/", async (req, res) => {
   const { prompt } = req.body;
   const sessionId = req.sessionID;
@@ -24,10 +21,8 @@ router.post("/", async (req, res) => {
   }
 
   try {
-    // 1. Retrieve session memory
     const chatHistory = req.session.chat_history || [];
 
-    // 2. Construct OpenAI message payload
     const messages = [
       {
         role: "system",
@@ -43,7 +38,6 @@ If the user query is vague (e.g. "Downtown condos"), infer and include a valid U
       { role: "user", content: prompt }
     ];
 
-    // 3. Query OpenAI
     const completion = await openai.chat.completions.create({
       model: MODEL_ID,
       messages,
@@ -55,7 +49,7 @@ If the user query is vague (e.g. "Downtown condos"), infer and include a valid U
 
     try {
       structuredData = JSON.parse(assistantReply);
-      console.log("🤖 Parsed Intent:", structuredData); // ✅ AI intent log
+      console.log("🤖 Parsed Intent:", structuredData);
     } catch (err) {
       console.error("❌ Failed to parse assistantReply:", assistantReply);
       return res.status(422).json({
@@ -64,85 +58,74 @@ If the user query is vague (e.g. "Downtown condos"), infer and include a valid U
       });
     }
 
-
-    // 4. Apply fallback if address/zip_code missing but location is present
     if (!structuredData.address && structuredData.location) {
       structuredData.address = structuredData.location;
     }
+
     if (!structuredData.zip_code) {
-      structuredData.zip_code = "00000"; // Default fallback; you may replace with inferred zip logic
+      structuredData.zip_code = "00000";
     }
 
-    // 5. Validate output
     if (!structuredData.address || !structuredData.zip_code) {
-      console.log("🧠 Raw OpenAI Output:", assistantReply);
-      console.log("📦 Parsed JSON:", structuredData);
-
       return res.status(422).json({
         error: "❌ Model returned incomplete data (missing address or zip_code)",
         model_output: structuredData
       });
     }
 
-    // 6. Save memory
     req.session.chat_history = [
       ...chatHistory,
       { role: "user", content: prompt },
       { role: "assistant", content: assistantReply }
     ];
 
-    // 7. Forward to internal Attom API
-   const { fetchMultipleProperties } = require("../utils/attom");
+    // ✅ Normalize input
+    const city = structuredData.city
+      ? structuredData.city.charAt(0).toUpperCase() + structuredData.city.slice(1).toLowerCase()
+      : undefined;
+    const state = structuredData.state ? structuredData.state.toUpperCase() : undefined;
 
-// Normalize input
-const city = structuredData.city
-  ? structuredData.city.charAt(0).toUpperCase() + structuredData.city.slice(1).toLowerCase()
-  : undefined;
-const state = structuredData.state ? structuredData.state.toUpperCase() : undefined;
-
-// Fetch from Attom via helper
-console.log("📤 Attom Request Params:", {
-  city,
-  state,
-  postalcode: structuredData.zip_code,
-  propertytype: structuredData.property_type?.toLowerCase(),
-  beds: `${structuredData.min_beds}-${structuredData.max_beds}`,
-  baths: `${structuredData.min_baths}-${structuredData.max_baths}`,
-  sqft: `${structuredData.min_sqft}-${structuredData.max_sqft}`,
-  sort: "distance"
-});
+    // ✅ Define attomParams BEFORE use
+    const attomParams = {
+  zip_code: structuredData.zip_code,  // ✅ MUST be present
+  property_type: structuredData.property_type || 'sfr',
+  max_price: structuredData.price,
+  min_beds: structuredData.min_beds || 1,
+  sort: 'salestransdate'
+};
 
 
+    console.log("📤 Final Attom Params to Snapshot:", attomParams);
 
-// Debug logs
-console.log("🏘️ Attom Raw Response:", JSON.stringify(attomResponse, null, 2));
-console.log("🏠 Listings Found:", attomResponse?.property?.length || 0);
+    let attomResponse = { property: [] };
 
-// Fallback check
-if (!attomResponse.property || attomResponse.property.length === 0) {
-  console.warn("⚠️ No Attom listings found with the given filters.");
-}
+    try {
+      attomResponse = await fetchMultipleProperties(attomParams);
+      console.log("🏘️ Attom Raw Response:", JSON.stringify(attomResponse, null, 2));
+    } catch (err) {
+      console.error("❌ Failed to fetch from Attom:", err.message);
+    }
 
+    console.log("🏠 Listings Found:", attomResponse?.property?.length || 0);
+    if (!attomResponse.property || attomResponse.property.length === 0) {
+      console.warn("⚠️ No Attom listings found with the given filters.");
+    }
 
-    // 8. Return final response
     console.log("✅ Returning enriched listings to frontend.");
-  return res.status(200).json({
-    session_id: sessionId,
-    input_prompt: prompt,
-    parsed_intent: structuredData,
-    property_data: attomResponse.property || [] // important!
-  });
+    return res.status(200).json({
+      session_id: sessionId,
+      input_prompt: prompt,
+      parsed_intent: structuredData,
+      property_data: attomResponse.property || []
+    });
 
-
-
-
-} catch (err) {
-  console.error("❌ AI Pipeline Error:", err.response?.data || err.message);
-  return res.status(500).json({
-    error: "AI pipeline failed",
-    details: err.response?.data || err.message
-  });
-}
+  } catch (err) {
+    console.error("❌ AI Pipeline Error:", err.response?.data || err.message);
+    return res.status(500).json({
+      error: "AI pipeline failed",
+      details: err.response?.data || err.message
+    });
+  }
 });
 
 module.exports = router;
