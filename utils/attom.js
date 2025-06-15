@@ -41,6 +41,8 @@ async function fetchMultipleProperties({ city, state, zip_code, max_price, min_b
     sort: 'salestransdate desc'
   };
 
+    console.log("📤 Final Attom Params to Snapshot:", params);
+
   return request('/property/snapshot', params);
 }
 

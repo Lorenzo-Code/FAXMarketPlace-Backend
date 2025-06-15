@@ -101,13 +101,17 @@ const city = structuredData.city
 const state = structuredData.state ? structuredData.state.toUpperCase() : undefined;
 
 // Fetch from Attom via helper
-const attomResponse = await fetchMultipleProperties({
+console.log("📤 Attom Request Params:", {
   city,
   state,
-  zip_code: structuredData.zip_code,
-  max_price: structuredData.price,
-  min_beds: structuredData.min_beds || 1
+  postalcode: structuredData.zip_code,
+  propertytype: structuredData.property_type?.toLowerCase(),
+  beds: `${structuredData.min_beds}-${structuredData.max_beds}`,
+  baths: `${structuredData.min_baths}-${structuredData.max_baths}`,
+  sqft: `${structuredData.min_sqft}-${structuredData.max_sqft}`,
+  sort: "distance"
 });
+
 
 
 // Debug logs
