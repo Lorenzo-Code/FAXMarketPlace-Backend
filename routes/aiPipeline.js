@@ -92,43 +92,53 @@ If the user query is vague (e.g. "Downtown condos"), infer and include a valid U
     ];
 
     // 7. Forward to internal Attom API
-    const { fetchMultipleProperties } = require("../utils/attom");
+   const { fetchMultipleProperties } = require("../utils/attom");
 
-    const attomResponse = await fetchMultipleProperties({
-      city: structuredData.city,
-      state: structuredData.state,
-      zip_code: structuredData.zip_code,
-      max_price: structuredData.max_price || 500000,
-      min_beds: structuredData.min_beds || 1
-    });
+// Normalize input
+const city = structuredData.city
+  ? structuredData.city.charAt(0).toUpperCase() + structuredData.city.slice(1).toLowerCase()
+  : undefined;
+const state = structuredData.state ? structuredData.state.toUpperCase() : undefined;
 
-    console.log("🏘️ Attom Raw Response:", JSON.stringify(attomResponse, null, 2)); // ✅ view full
-    console.log("🏠 Listings Found:", attomResponse?.property?.length || 0); // ✅ quick count
+// Fetch from Attom via helper
+const attomResponse = await fetchMultipleProperties({
+  city,
+  state,
+  zip_code: structuredData.zip_code,
+  max_price: structuredData.price,
+  min_beds: structuredData.min_beds || 1
+});
 
-    // ✅ Add your check and fallback warning here
-    if (!attomResponse.property || attomResponse.property.length === 0) {
-      console.warn("⚠️ No Attom listings found with the given filters.");
-    }
+
+// Debug logs
+console.log("🏘️ Attom Raw Response:", JSON.stringify(attomResponse, null, 2));
+console.log("🏠 Listings Found:", attomResponse?.property?.length || 0);
+
+// Fallback check
+if (!attomResponse.property || attomResponse.property.length === 0) {
+  console.warn("⚠️ No Attom listings found with the given filters.");
+}
+
 
     // 8. Return final response
     console.log("✅ Returning enriched listings to frontend.");
-    return res.status(200).json({
-      session_id: sessionId,
-      input_prompt: prompt,
-      parsed_intent: structuredData,
-      property_data: attomResponse.property || [] // important!
-    });
+  return res.status(200).json({
+    session_id: sessionId,
+    input_prompt: prompt,
+    parsed_intent: structuredData,
+    property_data: attomResponse.property || [] // important!
+  });
 
 
 
 
-  } catch (err) {
-    console.error("❌ AI Pipeline Error:", err.response?.data || err.message);
-    return res.status(500).json({
-      error: "AI pipeline failed",
-      details: err.response?.data || err.message
-    });
-  }
+} catch (err) {
+  console.error("❌ AI Pipeline Error:", err.response?.data || err.message);
+  return res.status(500).json({
+    error: "AI pipeline failed",
+    details: err.response?.data || err.message
+  });
+}
 });
 
 module.exports = router;
