@@ -7,6 +7,7 @@
     "dev": "nodemon index.js"
   },
   "dependencies": {
+    "@react-google-maps/api": "^2.20.6",
     "axios": "^1.9.0",
     "clean-css": "^4.1.11",
     "constantinople": "^3.1.1",
@@ -25,7 +26,9 @@
     "morgan": "~1.9.1",
     "node-fetch": "^2.7.0",
     "openai": "^5.3.0",
+    "p-limit": "^6.2.0",
     "pug": "^3.0.3",
+    "redis": "^5.5.6",
     "uglify-js": "^2.6.0"
   },
   "devDependencies": {

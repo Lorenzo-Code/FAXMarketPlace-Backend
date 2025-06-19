@@ -36,8 +36,10 @@ async function fetchMultipleProperties({
   max_price,
   min_beds = 1,
   property_type = "sfr",
-  sort = "salestransdate"
+  sort = "salestransdate",
+  page = 1 // ✅ Fix added here
 }) {
+
   // ✅ Robust sort fallback logic for Attom's picky API
   let safeSort = sort;
   const usingPostalOnly = zip_code && !city && !state;
@@ -50,11 +52,14 @@ async function fetchMultipleProperties({
 
   // ✅ Build request params safely
   const params = {
-    propertytype: property_type.toLowerCase(),
-    maxsaleamt: max_price || 500000,
-    minbeds: min_beds,
-    pagesize: 10,
-  };
+  propertytype: property_type.toLowerCase(),
+  maxsaleamt: max_price || 500000,
+  minbeds: min_beds,
+  page,
+  pagesize: 30,
+  postalcode: zip_code // keep this!
+};
+
 
   if (safeSort) {
     params.sort = safeSort;

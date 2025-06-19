@@ -1,6 +1,8 @@
 const express = require("express");
 const { OpenAI } = require("openai");
 const { fetchMultipleProperties } = require("../utils/attom");
+const { fetchZillowPhotos } = require('../utils/fetchZillowPhotos');
+
 
 const router = express.Router();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -10,11 +12,13 @@ const MODEL_ID = "ft:gpt-3.5-turbo-1106:fractionax:fractionax-v3:BiLkkGbl";
 router.post("/reset", (req, res) => {
   req.session.chat_history = [];
   res.status(200).json({ message: "🧠 Session memory cleared." });
+  
 });
 
 router.post("/", async (req, res) => {
-  const { prompt } = req.body;
+  const { prompt, limit = 30 } = req.body;
   const sessionId = req.sessionID;
+
 
   if (!prompt) {
     return res.status(400).json({ error: "❌ Missing prompt." });
@@ -58,14 +62,13 @@ If the user query is vague (e.g. "Downtown condos"), infer and include a valid U
       });
     }
 
+    // Fallbacks
     if (!structuredData.address && structuredData.location) {
       structuredData.address = structuredData.location;
     }
-
     if (!structuredData.zip_code) {
       structuredData.zip_code = "00000";
     }
-
     if (!structuredData.address || !structuredData.zip_code) {
       return res.status(422).json({
         error: "❌ Model returned incomplete data (missing address or zip_code)",
@@ -79,21 +82,15 @@ If the user query is vague (e.g. "Downtown condos"), infer and include a valid U
       { role: "assistant", content: assistantReply }
     ];
 
-    // ✅ Normalize input
-    const city = structuredData.city
-      ? structuredData.city.charAt(0).toUpperCase() + structuredData.city.slice(1).toLowerCase()
-      : undefined;
-    const state = structuredData.state ? structuredData.state.toUpperCase() : undefined;
-
-    // ✅ Define attomParams BEFORE use
     const attomParams = {
-  zip_code: structuredData.zip_code,  // ✅ MUST be present
-  property_type: structuredData.property_type || 'sfr',
-  max_price: structuredData.price,
-  min_beds: structuredData.min_beds || 1,
-  sort: 'salestransdate'
-};
+      zip_code: structuredData.zip_code,
+      property_type: structuredData.property_type || "sfr",
+      max_price: structuredData.price,
+      min_beds: structuredData.min_beds || 1,
+      sort: "salestransdate",
+      limit: limit 
 
+    };
 
     console.log("📤 Final Attom Params to Snapshot:", attomParams);
 
@@ -111,13 +108,66 @@ If the user query is vague (e.g. "Downtown condos"), infer and include a valid U
       console.warn("⚠️ No Attom listings found with the given filters.");
     }
 
+    // ✅ Zillow Enrichment
+    let enrichedListings = attomResponse.property || [];
+
+if (enrichedListings.length) {
+  console.log("🖼 Enriching listings with Zillow images...");
+console.log("📦 Total listings to enrich:", enrichedListings.length);
+
+const imageMap = new Map();
+
+for (const listing of enrichedListings) {
+  const fullAddress = listing.address?.oneLine;
+  const zip = listing.address?.postal1;
+
+  if (!fullAddress || !zip) continue;
+
+  console.log("📬 Fetching Zillow images for:", fullAddress);
+
+  try {
+    const zillowImages = await fetchZillowPhotos(listing.address.line1, zip);
+
+    if (zillowImages.length) {
+      console.log(`📸 Got ${zillowImages.length} images for ${fullAddress}`);
+      const normalized = fullAddress.replace(/\s+/g, '').toLowerCase();
+      imageMap.set(normalized, zillowImages[0].imgSrc); // grab first image
+    } else {
+      console.log(`❌ No images found for ${fullAddress}`);
+    }
+  } catch (err) {
+    console.error(`❌ Failed fetching Zillow images for ${fullAddress}:`, err.message);
+  }
+}
+
+enrichedListings = enrichedListings.map((listing, index) => {
+  const oneLine = listing.address?.oneLine || "";
+  const normalized = oneLine.replace(/\s+/g, '').toLowerCase();
+  const image = imageMap.get(normalized) || null;
+
+  console.log(`🏠 Listing #${index + 1} Address: ${oneLine}`);
+  console.log(`🔍 Normalized Address: ${normalized}`);
+  console.log(`📸 Matched Image: ${image ? "✅ Found" : "❌ No match found"}`);
+
+  return { ...listing, image };
+});
+
+}
+
+    else {
+      console.warn("⚠️ No listings found in Attom response.");
+    }
+
     console.log("✅ Returning enriched listings to frontend.");
+    console.log("📤 Sample Enriched Listing:", enrichedListings[0]);
+
     return res.status(200).json({
       session_id: sessionId,
       input_prompt: prompt,
       parsed_intent: structuredData,
-      property_data: attomResponse.property || []
+      property_data: enrichedListings
     });
+
 
   } catch (err) {
     console.error("❌ AI Pipeline Error:", err.response?.data || err.message);
@@ -127,5 +177,6 @@ If the user query is vague (e.g. "Downtown condos"), infer and include a valid U
     });
   }
 });
+
 
 module.exports = router;
