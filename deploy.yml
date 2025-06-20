@@ -1,0 +1,30 @@
+# File: .github/workflows/deploy.yml
+
+name: Deploy to Droplet
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: SSH into Droplet and Deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: root
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          script: |
+            cd /root/FAXMarketPlace-Backend
+            git pull origin main
+            docker stop fax-api || true
+            docker rm fax-api || true
+            docker build -t fax-backend .
+            docker run -d --env-file .env -p 8000:8000 --name fax-api fax-backend
