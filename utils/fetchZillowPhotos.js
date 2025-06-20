@@ -1,7 +1,7 @@
 require("dotenv").config();
 const axios = require("axios");
 const redis = require("redis");
-const pLimit = require("p-limit").default;
+const pLimit = require("p-limit");
 
 const redisClient = redis.createClient(); // default: localhost:6379
 
