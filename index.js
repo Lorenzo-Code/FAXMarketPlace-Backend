@@ -6,6 +6,9 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 const session = require("express-session"); // ✅ Add this
+const subscribeRoute = require('./routes/subscribe');
+
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -60,6 +63,7 @@ const aiSearchRoute = require('./routes/aiSearch');
 const schoolInfoRoute = require('./routes/schoolInfo');
 const attomDataRoute = require('./routes/attomData');
 const aiPipelineRoute = require('./routes/aiPipeline');
+const preSaleSignupRoute = require('./routes/pre-sale-signup');
 
 // ✅ API Routes
 app.use("/api/token-prices", tokenPricesRoute);
@@ -67,6 +71,9 @@ app.use("/api/ai-search", aiSearchRoute);
 app.use("/api/schools", schoolInfoRoute);
 app.use("/api/attom-data", attomDataRoute);
 app.use("/api/ai-pipeline", aiPipelineRoute);
+app.use("/api/subscribe", subscribeRoute);
+app.use("/api/pre-sale-signup", preSaleSignupRoute);
+
 
 // ✅ Health Check
 app.get("/", (req, res) => {
