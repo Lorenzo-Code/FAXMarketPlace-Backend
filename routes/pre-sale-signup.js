@@ -1,30 +1,43 @@
 const express = require("express");
 const router = express.Router();
 const axios = require("axios");
-const db = require("../config/db"); // or wherever your Mongo instance is
 
+// 🛡️ Optional DB import if used
+let db;
+try {
+  db = require("../config/db");
+} catch (e) {
+  console.warn("⚠️ No DB connected — proceeding without local storage.");
+}
+
+// POST /api/pre-sale-signup
 router.post("/", async (req, res) => {
   const { email, wallet } = req.body;
-  if (!email) return res.status(400).send("Missing email");
+
+  if (!email || !email.includes("@")) {
+    return res.status(400).json({ error: "Invalid email" });
+  }
 
   try {
-    // Optional: Send to ConvertKit
+    // ✅ Send to ConvertKit (optional)
     await axios.post(`https://api.convertkit.com/v3/tags/${process.env.CONVERTKIT_PRESALE_TAG_ID}/subscribe`, {
       api_key: process.env.CONVERTKIT_API_KEY,
       email,
     });
 
-    // Optional: Store locally
-    await db.collection("presale_signups").insertOne({
-      email,
-      wallet: wallet || null,
-      createdAt: new Date(),
-    });
+    // ✅ Store locally if db is connected
+    if (db && db.collection) {
+      await db.collection("presale_signups").insertOne({
+        email,
+        wallet: wallet || null,
+        createdAt: new Date(),
+      });
+    }
 
-    res.status(200).send("Presale interest recorded");
+    return res.status(200).json({ message: "Presale interest recorded" });
   } catch (err) {
     console.error("Presale signup error:", err.response?.data || err.message);
-    res.status(500).send("Server error");
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
