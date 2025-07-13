@@ -27,6 +27,19 @@ const corsOptions = {
   credentials: true,
 };
 
+const redis = require("redis");
+const client = redis.createClient({ url: 'redis://host:port' });
+
+client.on("connect", () => {
+  console.log("✅ Connected to Redis");
+});
+
+client.connect().catch((err) => {
+  console.error("❌ Redis Connection Error:", err);
+});
+
+
+
 // ✅ Middleware
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
