@@ -28,15 +28,25 @@ const corsOptions = {
 };
 
 const redis = require("redis");
-const client = redis.createClient({ url: 'redis://host:port' });
+
+// Use env vars to support local vs production
+const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+
+const client = redis.createClient({ url: redisUrl });
 
 client.on("connect", () => {
   console.log("✅ Connected to Redis");
 });
 
-client.connect().catch((err) => {
-  console.error("❌ Redis Connection Error:", err);
+client.on("error", (err) => {
+  console.error("❌ Redis Client Error:", err);
 });
+
+client.connect().catch((err) => {
+  console.error("❌ Redis Connection Failed:", err);
+});
+
+module.exports = client;
 
 
 
