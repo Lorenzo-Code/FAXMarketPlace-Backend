@@ -7,6 +7,8 @@ const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 const session = require("express-session"); // ✅ Add this
 const subscribeRoute = require('./routes/subscribe');
+const router = express.Router();
+const redisClient = require("./utils/redisClient");
 
 
 
@@ -27,12 +29,13 @@ const corsOptions = {
   credentials: true,
 };
 
-const redis = require("redis");
+
 
 // Use env vars to support local vs production
-const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
-
-const client = redis.createClient({ url: redisUrl });
+const redis = require("redis");
+const client = redis.createClient({
+  url: process.env.REDIS_URL,
+});
 
 client.on("connect", () => {
   console.log("✅ Connected to Redis");
@@ -48,6 +51,26 @@ client.connect().catch((err) => {
 
 module.exports = client;
 
+router.get("/api/cache-stats", async (req, res) => {
+  try {
+    const hits = parseInt(await redisClient.get("zillow:stats:hits")) || 0;
+    const misses = parseInt(await redisClient.get("zillow:stats:misses")) || 0;
+    
+    const total = hits + misses;
+    const hitRate = total ? ((hits / total) * 100).toFixed(2) : "0.00";
+
+    res.json({
+      hits,
+      misses,
+      hitRate: `${hitRate}%`,
+    });
+  } catch (err) {
+    console.error("Cache stats error:", err);
+    res.status(500).send("Unable to fetch cache stats");
+  }
+});
+
+module.exports = router;
 
 
 // ✅ Middleware
@@ -87,6 +110,8 @@ const schoolInfoRoute = require('./routes/schoolInfo');
 const attomDataRoute = require('./routes/attomData');
 const aiPipelineRoute = require('./routes/aiPipeline');
 const preSaleSignupRoute = require('./routes/pre-sale-signup');
+const cacheStatsRoute = require('./routes/cacheStats');
+
 
 // ✅ API Routes
 app.use("/api/token-prices", tokenPricesRoute);
@@ -96,6 +121,8 @@ app.use("/api/attom-data", attomDataRoute);
 app.use("/api/ai-pipeline", aiPipelineRoute);
 app.use("/api/subscribe", subscribeRoute);
 app.use("/api/pre-sale-signup", preSaleSignupRoute);
+app.use("/api/cache/stats", cacheStatsRoute);
+
 
 
 // ✅ Health Check
