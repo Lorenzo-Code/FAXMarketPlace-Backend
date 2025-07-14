@@ -96,6 +96,16 @@ const aiPipelineRoute = require('./routes/aiPipeline');
 const preSaleSignupRoute = require('./routes/pre-sale-signup');
 const cacheStatsRoute = require('./routes/cacheStats');
 
+// ✅ Health Check route FIRST
+app.get("/", (req, res) => {
+  res.status(200).json({ status: "✅ FractionaX Backend API is live" });
+});
+
+// ❌ 404 handler LAST
+app.use((req, res, next) => {
+  res.status(404).json({ error: `Route not found: ${req.originalUrl}` });
+});
+
 
 // ✅ API Routes
 app.use("/api/token-prices", tokenPricesRoute);
@@ -110,22 +120,6 @@ app.get("/api/test", (req, res) => {
   res.json({ status: "✅ API is live" });
 });
 
-app.use((req, res, next) => {
-  res.status(404).json({ error: `Route not found: ${req.originalUrl}` });
-});
-
-
-
-
-// ✅ Health Check
-app.get("/", (req, res) => {
-  res.status(200).send("✅ FractionaX Backend API is live");
-});
-
-// ✅ Start Server
-// app.listen(PORT, () => {
-//   console.log(`🚀 Server running on port ${PORT}`);
-// });
 
 app.listen(5000, '0.0.0.0', () => {
   console.log("Server running on port 5000");
