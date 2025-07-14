@@ -29,6 +29,12 @@ const corsOptions = {
   credentials: true,
 };
 
+// ✅ Middleware
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+app.use(helmet());
+app.use(express.json());
+app.use(morgan("combined"));
 
 
 // Use env vars to support local vs production
@@ -73,12 +79,6 @@ router.get("/api/cache-stats", async (req, res) => {
 module.exports = router;
 
 
-// ✅ Middleware
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
-app.use(helmet());
-app.use(express.json());
-app.use(morgan("combined"));
 
 // ✅ Add session middleware BEFORE routes
 app.use(
@@ -103,6 +103,12 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+app.use((req, res, next) => {
+  console.log(`🌐 Incoming request: ${req.method} ${req.originalUrl}`);
+  next();
+});
+
+
 // ✅ Import routes
 const tokenPricesRoute = require('./routes/tokenPrices');
 const aiSearchRoute = require('./routes/aiSearch');
@@ -122,6 +128,10 @@ app.use("/api/ai-pipeline", aiPipelineRoute);
 app.use("/api/subscribe", subscribeRoute);
 app.use("/api/pre-sale-signup", preSaleSignupRoute);
 app.use("/api/cache/stats", cacheStatsRoute);
+app.use((req, res, next) => {
+  res.status(404).json({ error: `Route not found: ${req.originalUrl}` });
+});
+
 
 
 
