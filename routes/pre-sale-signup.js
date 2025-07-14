@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const axios = require("axios");
 
-// 🛡️ Optional DB import if used
+// Optional DB connection
 let db;
 try {
   db = require("../config/db");
@@ -15,17 +15,30 @@ router.post("/", async (req, res) => {
   const { email, wallet } = req.body;
 
   if (!email || !email.includes("@")) {
-    return res.status(400).json({ error: "Invalid email" });
+    return res.status(400).json({ error: "Invalid email address." });
   }
 
   try {
-    // ✅ Send to ConvertKit (optional)
-    await axios.post(`https://api.convertkit.com/v3/tags/${process.env.CONVERTKIT_PRESALE_TAG_ID}/subscribe`, {
-      api_key: process.env.CONVERTKIT_API_KEY,
-      email,
-    });
+    // ✅ Send to MailerLite v3
+    const mlResponse = await axios.post(
+      "https://connect.mailerlite.com/api/subscribers",
+      {
+        email,
+        fields: {
+          wallet_address: wallet || "",
+        },
+        groups: [process.env.MAILERLITE_PRESALE_GROUP_ID]
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.MAILERLITE_API_KEY}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      }
+    );
 
-    // ✅ Store locally if db is connected
+    // ✅ Optional: store locally in DB
     if (db && db.collection) {
       await db.collection("presale_signups").insertOne({
         email,
@@ -34,10 +47,13 @@ router.post("/", async (req, res) => {
       });
     }
 
-    return res.status(200).json({ message: "Presale interest recorded" });
+    return res.status(200).json({
+      message: "Presale interest recorded",
+      ml_subscriber_id: mlResponse.data?.data?.id,
+    });
   } catch (err) {
-    console.error("Presale signup error:", err.response?.data || err.message);
-    return res.status(500).json({ error: "Server error" });
+    console.error("❌ Presale signup error:", err.response?.data || err.message);
+    return res.status(500).json({ error: "Server error during pre-sale signup." });
   }
 });
 
