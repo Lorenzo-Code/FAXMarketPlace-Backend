@@ -7,7 +7,6 @@ const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 const session = require("express-session"); // ✅ Add this
 const subscribeRoute = require('./routes/subscribe');
-const router = express.Router();
 const redisClient = require("./utils/redisClient");
 
 
@@ -56,27 +55,6 @@ client.connect().catch((err) => {
 });
 
 module.exports = client;
-
-router.get("/api/cache-stats", async (req, res) => {
-  try {
-    const hits = parseInt(await redisClient.get("zillow:stats:hits")) || 0;
-    const misses = parseInt(await redisClient.get("zillow:stats:misses")) || 0;
-    
-    const total = hits + misses;
-    const hitRate = total ? ((hits / total) * 100).toFixed(2) : "0.00";
-
-    res.json({
-      hits,
-      misses,
-      hitRate: `${hitRate}%`,
-    });
-  } catch (err) {
-    console.error("Cache stats error:", err);
-    res.status(500).send("Unable to fetch cache stats");
-  }
-});
-
-module.exports = router;
 
 
 
@@ -128,6 +106,10 @@ app.use("/api/ai-pipeline", aiPipelineRoute);
 app.use("/api/subscribe", subscribeRoute);
 app.use("/api/pre-sale-signup", preSaleSignupRoute);
 app.use("/api/cache/stats", cacheStatsRoute);
+app.get("/api/test", (req, res) => {
+  res.json({ status: "✅ API is live" });
+});
+
 app.use((req, res, next) => {
   res.status(404).json({ error: `Route not found: ${req.originalUrl}` });
 });
