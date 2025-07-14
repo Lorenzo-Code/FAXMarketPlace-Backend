@@ -15,7 +15,8 @@ router.post("/reset", (req, res) => {
   
 });
 
-router.post("/", async (req, res) => {
+router.post(["/", ""], async (req, res) => {
+  
   const { prompt, limit = 30 } = req.body;
   const sessionId = req.sessionID;
 
