@@ -28,7 +28,11 @@ router.post("/subscribe", async (req, res) => {
       }
     );
 
-    res.status(200).json({ message: "🎉 Subscribed successfully!", data: response.data });
+    // ✅ Success response only
+    res.status(200).json({
+      message: "🎉 Subscribed successfully!",
+      data: response.data,
+    });
   } catch (err) {
     console.error("❌ MailerLite API error:", err.response?.data || err.message);
     res.status(err.response?.status || 500).json({

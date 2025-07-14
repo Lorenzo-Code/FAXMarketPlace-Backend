@@ -6,8 +6,6 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 const session = require("express-session"); // ✅ Add this
-const subscribeRoute = require('./routes/newsletter');
-const redisClient = require("./utils/redisClient");
 
 
 
@@ -34,28 +32,6 @@ app.options('*', cors(corsOptions));
 app.use(helmet());
 app.use(express.json());
 app.use(morgan("combined"));
-
-
-// Use env vars to support local vs production
-const redis = require("redis");
-const client = redis.createClient({
-  url: process.env.REDIS_URL,
-});
-
-client.on("connect", () => {
-  console.log("✅ Connected to Redis");
-});
-
-client.on("error", (err) => {
-  console.error("❌ Redis Client Error:", err);
-});
-
-client.connect().catch((err) => {
-  console.error("❌ Redis Connection Failed:", err);
-});
-
-module.exports = client;
-
 
 
 // ✅ Add session middleware BEFORE routes
@@ -95,7 +71,8 @@ const attomDataRoute = require('./routes/attomData');
 const aiPipelineRoute = require('./routes/aiPipeline');
 const preSaleSignupRoute = require('./routes/pre-sale-signup');
 const cacheStatsRoute = require('./routes/cacheStats');
-const newsletterRoute = require("./routes/newsletter");
+const emailCollectionRoute = require('./routes/api/emailCollection');
+
 
 
 // ✅ Health Check route FIRST
@@ -110,9 +87,9 @@ app.use("/api/ai-search", aiSearchRoute);
 app.use("/api/schools", schoolInfoRoute);
 app.use("/api/attom-data", attomDataRoute);
 app.use("/api/ai-pipeline", aiPipelineRoute);
-app.use("/api/newsletter", newsletterRoute);;
 app.use("/api/pre-sale-signup", preSaleSignupRoute);
 app.use("/api/cache/stats", cacheStatsRoute);
+app.use('/api/email', emailCollectionRoute);
 app.get("/api/test", (req, res) => {
   res.json({ status: "✅ API is live" });
 });

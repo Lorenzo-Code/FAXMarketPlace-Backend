@@ -1,7 +1,6 @@
 require("dotenv").config();
 const axios = require("axios");
 const pLimit = require("p-limit");
-const redisClient = require("../utils/redisClient").redisClient;
 
 const { getAsync, setAsync, incrementCounter, ensureRedisConnected } = require("../utils/redisClient");
 
