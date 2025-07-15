@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 
-const auth = (req, res, next) => {
+// 🔐 Verify JWT Token
+const verifyToken = (req, res, next) => {
   const token = req.header("Authorization")?.replace("Bearer ", "");
   if (!token) return res.status(401).json({ msg: "No token, authorization denied" });
 
@@ -13,4 +14,16 @@ const auth = (req, res, next) => {
   }
 };
 
-module.exports = auth;
+// 🛡️ Authorize Admin Only
+const authorizeAdmin = (req, res, next) => {
+  if (req.user && req.user.role === "admin") {
+    return next();
+  }
+  return res.status(403).json({ msg: "Access denied — Admins only" });
+};
+
+// ✅ Export both middlewares
+module.exports = {
+  verifyToken,
+  authorizeAdmin,
+};

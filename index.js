@@ -7,6 +7,7 @@ const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 const session = require("express-session");
 const mongoose = require("mongoose");
+const { verifyToken, authorizeAdmin } = require("./middleware/auth");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -25,9 +26,7 @@ const corsOptions = {
   credentials: true,
 };
 
-const auth = require('./middleware/auth'); // Add this if you haven’t yet
-
-app.get("/api/protected", auth, (req, res) => {
+app.get("/api/protected", verifyToken, (req, res) => {
   res.json({ msg: `Hello, ${req.user.email}`, user: req.user });
 });
 
@@ -85,6 +84,7 @@ const cacheStatsRoute = require('./routes/cacheStats');
 const emailCollectionRoute = require('./routes/api/emailCollection');
 
 
+
 // ✅ Health Check
 app.get("/", (req, res) => {
   res.status(200).json({ status: "✅ FractionaX Backend API is live" });
@@ -100,6 +100,10 @@ app.use("/api/ai-pipeline", aiPipelineRoute);
 app.use("/api/pre-sale-signup", preSaleSignupRoute);
 app.use("/api/cache/stats", cacheStatsRoute);
 app.use("/api/email", emailCollectionRoute);
+app.get("/api/admin/dashboard", verifyToken, authorizeAdmin, (req, res) => {
+  res.json({ message: "Welcome to the admin dashboard." });
+});
+
 
 // ✅ Test route
 app.get("/api/test", (req, res) => {
