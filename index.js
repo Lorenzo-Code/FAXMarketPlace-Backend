@@ -101,8 +101,10 @@ app.use("/api/pre-sale-signup", preSaleSignupRoute);
 app.use("/api/cache/stats", cacheStatsRoute);
 app.use("/api/email", emailCollectionRoute);
 app.get("/api/admin/dashboard", verifyToken, authorizeAdmin, (req, res) => {
+  console.log("🔐 Admin Access:", req.user);
   res.json({ message: "Welcome to the admin dashboard." });
 });
+
 
 
 // ✅ Test route
