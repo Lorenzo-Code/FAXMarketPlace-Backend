@@ -82,6 +82,7 @@ const aiPipelineRoute = require('./routes/aiPipeline');
 const preSaleSignupRoute = require('./routes/pre-sale-signup');
 const cacheStatsRoute = require('./routes/cacheStats');
 const emailCollectionRoute = require('./routes/api/emailCollection');
+const adminRoutes = require("./routes/admin");
 
 
 
@@ -100,10 +101,8 @@ app.use("/api/ai-pipeline", aiPipelineRoute);
 app.use("/api/pre-sale-signup", preSaleSignupRoute);
 app.use("/api/cache/stats", cacheStatsRoute);
 app.use("/api/email", emailCollectionRoute);
-app.get("/api/admin/dashboard", verifyToken, authorizeAdmin, (req, res) => {
-  console.log("🔐 Admin Access:", req.user);
-  res.json({ message: "Welcome to the admin dashboard." });
-});
+app.use("/api/admin", adminRoutes);
+
 
 
 
