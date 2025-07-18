@@ -100,6 +100,30 @@ router.get("/token-analytics", verifyToken, authorizeAdmin, (req, res) => {
   });
 });
 
+const AuditLog = require("../models/AuditLog");
+
+router.get("/audit-logs", verifyToken, authorizeAdmin, async (req, res) => {
+  try {
+    const { event, userId, role, limit = 100 } = req.query;
+
+    // Build query dynamically based on filters
+    const query = {};
+    if (event) query.event = event;
+    if (userId) query.user = userId;
+    if (role) query.role = role;
+
+    const logs = await AuditLog.find(query)
+      .populate("user", "email")
+      .sort({ createdAt: -1 })
+      .limit(Number(limit));
+
+    res.json({ logs });
+  } catch (err) {
+    console.error("❌ Audit log fetch error:", err);
+    res.status(500).json({ msg: "Failed to fetch audit logs", error: err.message });
+  }
+});
+
 
 
 module.exports = router;

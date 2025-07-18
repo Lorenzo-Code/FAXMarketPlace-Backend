@@ -26,7 +26,7 @@ router.post(["/", ""], async (req, res) => {
   }
 
   try {
-    const chatHistory = req.session.chat_history || [];
+    const chatHistory = req.body.chat_history || [];
 
     const messages = [
       {

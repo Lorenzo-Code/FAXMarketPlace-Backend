@@ -5,7 +5,6 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
-const session = require("express-session");
 const mongoose = require("mongoose");
 const { verifyToken, authorizeAdmin } = require("./middleware/auth");
 
@@ -38,18 +37,6 @@ app.use(helmet());
 app.use(express.json());
 app.use(morgan("combined"));
 
-// ✅ Session Middleware
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "fractionax-default-secret",
-    resave: false,
-    saveUninitialized: true,
-    cookie: {
-      secure: false, // Set to true in production with HTTPS
-      maxAge: 1000 * 60 * 60, // 1 hour
-    },
-  })
-);
 
 // ✅ Rate Limiting
 app.set("trust proxy", 1);

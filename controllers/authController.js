@@ -32,7 +32,7 @@ exports.register = async (req, res) => {
         id: newUser._id,
         email: newUser.email,
       },
-      token,
+      token: generateToken(user),
     });
   } catch (err) {
     res.status(500).json({ msg: "Registration failed", error: err.message });
@@ -58,7 +58,7 @@ exports.login = async (req, res) => {
         email: user.email,
         role: user.role,
       },
-      token,
+      token: generateToken(user),
     });
   } catch (err) {
     res.status(500).json({ msg: "Login failed", error: err.message });
