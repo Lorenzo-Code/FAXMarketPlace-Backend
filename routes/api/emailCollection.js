@@ -5,8 +5,8 @@ const router = express.Router();
 const MAILERLITE_API_URL = "https://connect.mailerlite.com/api/subscribers";
 
 router.post("/subscribe", async (req, res) => {
-  const { email } = req.body;
-  const groupId = "159926948262315605"; // Your MailerLite Group ID
+  const { email, name } = req.body;
+  const groupId = "159926948262315605"; // Replace with your actual group ID
 
   if (!email) {
     return res.status(400).json({ error: "Email is required." });
@@ -18,6 +18,10 @@ router.post("/subscribe", async (req, res) => {
       {
         email,
         groups: [groupId],
+        type: "unconfirmed", // 🚨 This triggers the double opt-in confirmation email
+        fields: {
+          name: name || "",
+        },
       },
       {
         headers: {
@@ -28,9 +32,8 @@ router.post("/subscribe", async (req, res) => {
       }
     );
 
-    // ✅ Success response only
     res.status(200).json({
-      message: "🎉 Subscribed successfully!",
+      message: "🎉 Confirmation email sent! Please check your inbox.",
       data: response.data,
     });
   } catch (err) {
