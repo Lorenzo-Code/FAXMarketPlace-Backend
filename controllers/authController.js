@@ -4,35 +4,39 @@ const User = require("../models/User");
 
 const generateToken = (user) => {
   return jwt.sign(
-    { id: user._id, email: user.email, role: user.role },
+    { id: user._id, email: user.email, role: user.role, },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
 };
 
 exports.register = async (req, res) => {
-  const { email, password } = req.body;
+  console.log("Incoming registration body:", req.body);
+
+  const { firstName, lastName, email, password } = req.body;
 
   try {
     const existingUser = await User.findOne({ email });
     if (existingUser) return res.status(400).json({ msg: "Email already exists" });
 
-    const hashedPassword = await bcrypt.hash(password, 12); // ✅ this must have 12
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-    const newUser = await User.create({ email, password: hashedPassword });
+    const newUser = await User.create({
+      firstName,
+      lastName,
+      email,
+      password: hashedPassword,
+    });
 
-    const token = jwt.sign(
-      { id: newUser._id, email: newUser.email },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = generateToken(newUser); // ✅ Use your wrapper
 
     res.status(201).json({
       user: {
         id: newUser._id,
         email: newUser.email,
+        role: newUser.role,
       },
-      token: generateToken(user),
+      token, // includes role now!
     });
   } catch (err) {
     res.status(500).json({ msg: "Registration failed", error: err.message });
@@ -58,8 +62,9 @@ exports.login = async (req, res) => {
         email: user.email,
         role: user.role,
       },
-      token: generateToken(user),
+      token, // ✅ use the previously generated token
     });
+
   } catch (err) {
     res.status(500).json({ msg: "Login failed", error: err.message });
   }

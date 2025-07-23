@@ -1,9 +1,13 @@
-var express = require('express');
-var router = express.Router();
+const express = require("express");
+const router = express.Router();
+const { verifyToken, authorizeAdmin } = require("../middleware/auth");
 
-/* GET users listing. */
-router.get('/', function(req, res, next) {
-  res.send('respond with a resource');
+// Protected route (any authenticated user)
+router.get("/me", verifyToken, (req, res) => {
+  res.json({ user: req.user });
 });
 
-module.exports = router;
+// Admin-only route
+router.post("/admin/data", verifyToken, authorizeAdmin, (req, res) => {
+  res.json({ message: "Welcome Admin!" });
+});
