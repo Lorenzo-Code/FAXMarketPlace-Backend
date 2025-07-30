@@ -1,7 +1,8 @@
 const express = require("express");
 const { OpenAI } = require("openai");
-const { fetchMultipleProperties } = require("../utils/attom");
-const { fetchZillowPhotos } = require('../utils/fetchZillowPhotos');
+const { fetchMultipleProperties } = require('../../../services/attom');
+const { fetchZillowPhotos } = require('../../../services/fetchZillow');
+
 
 
 const router = express.Router();

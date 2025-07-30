@@ -6,7 +6,9 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 const mongoose = require("mongoose");
-const { verifyToken, authorizeAdmin } = require("./middleware/auth");
+const { verifyToken } = require("./middleware/auth");
+const session = require('express-session');
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -25,18 +27,12 @@ const corsOptions = {
   credentials: true,
 };
 
-app.get("/api/protected", verifyToken, (req, res) => {
-  res.json({ msg: `Hello, ${req.user.email}`, user: req.user });
-});
-
-
 // ✅ Middleware
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 app.use(helmet());
 app.use(express.json());
 app.use(morgan("combined"));
-
 
 // ✅ Rate Limiting
 app.set("trust proxy", 1);
@@ -59,43 +55,64 @@ mongoose.connect(process.env.MONGO_URI, {
 }).then(() => console.log("📦 Connected to MongoDB"))
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
+
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'keyboard_cat',
+  resave: false,
+  saveUninitialized: true,
+  cookie: {
+    maxAge: 86400000, // 1 day
+    secure: false,     // true if using HTTPS
+    httpOnly: true
+  }
+}));
+
 // ✅ Route Imports
 const authRoutes = require('./routes/auth');
-const tokenPricesRoute = require('./routes/tokenPrices');
-const aiSearchRoute = require('./routes/aiSearch');
+const adminRoutes = require('./routes/admin');
+const blogRoutes = require('./routes/api/blog');
+const emailCollectionRoute = require('./routes/api/emailCollection');
+const cacheStatsRoute = require('./routes/cacheStats');
 const schoolInfoRoute = require('./routes/schoolInfo');
 const attomDataRoute = require('./routes/attomData');
-const aiPipelineRoute = require('./routes/aiPipeline');
-const cacheStatsRoute = require('./routes/cacheStats');
-const emailCollectionRoute = require('./routes/api/emailCollection');
-const adminRoutes = require("./routes/admin");
+const tokenPricesRoute = require('./routes/tokenPrices');
 
-
+// ✅ AI Routes
+const aiSearchRoutes = require('./routes/api/ai/search');
+const pipelineRouter = require('./routes/api/ai/pipeline');
+// const aiFaqRoutes = require('./routes/api/ai/faq');
 
 // ✅ Health Check
 app.get("/", (req, res) => {
   res.status(200).json({ status: "✅ FractionaX Backend API is live" });
 });
 
+// ✅ Protected Test Route
+app.get("/api/protected", verifyToken, (req, res) => {
+  res.json({ msg: `Hello, ${req.user.email}`, user: req.user });
+});
+
 // ✅ API Routes
-app.use("/api/auth", authRoutes); // <<== 👈 NEW AUTH ROUTE
-app.use("/api/token-prices", tokenPricesRoute);
-app.use("/api/ai-search", aiSearchRoute);
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/blogs", blogRoutes);
+app.use("/api/email", emailCollectionRoute);
+app.use("/api/cache/stats", cacheStatsRoute);
 app.use("/api/schools", schoolInfoRoute);
 app.use("/api/attom-data", attomDataRoute);
-app.use("/api/ai-pipeline", aiPipelineRoute);
-app.use("/api/cache/stats", cacheStatsRoute);
-app.use("/api/email", emailCollectionRoute);
-app.use("/api/admin", adminRoutes);
+app.use("/api/token-prices", tokenPricesRoute);
 
+// ✅ AI Tools Routes
+app.use("/api/ai/search", aiSearchRoutes);
+app.use('/api/ai/pipeline', pipelineRouter);
+console.log("🧪 Loaded pipelineRouter:", typeof pipelineRouter); // should be "function"
 
+// app.use("/api/ai/faq", aiFaqRoutes);
 
-
-// ✅ Test route
+// ✅ Test Route
 app.get("/api/test", (req, res) => {
   res.json({ status: "✅ API is live" });
 });
-
 
 // ❌ 404 Handler
 app.use((req, res) => {
