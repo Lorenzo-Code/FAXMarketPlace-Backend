@@ -21,7 +21,7 @@ router.get('/', async (req, res) => {
     const responseData = { blogs };
     
     // 💾 Cache for 2 hours (blog listings change infrequently)
-    await setAsync(cacheKey, responseData, 7200);
+    await setAsync(cacheKey, JSON.stringify(responseData), 7200);
     console.log('📝 Cached blog listing');
     
     res.json({ fromCache: false, ...responseData });
@@ -56,7 +56,7 @@ router.get('/:idOrSlug', async (req, res) => {
     if (!blog) return res.status(404).json({ error: 'Blog not found' });
 
     // 💾 Cache individual blog posts for 2 hours (they rarely change)
-    await setAsync(cacheKey, blog, 7200);
+    await setAsync(cacheKey, JSON.stringify(blog), 7200);
     console.log(`📝 Cached blog post: ${idOrSlug}`);
 
     res.json({ fromCache: false, ...blog.toObject() });

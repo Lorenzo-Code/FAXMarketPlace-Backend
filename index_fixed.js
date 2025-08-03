@@ -11,7 +11,6 @@ const compression = require("compression");
 const csrf = require("csurf");
 const mongoose = require("mongoose");
 const session = require("express-session");
-const cookieParser = require("cookie-parser");
 const path = require("path");
 
 const { verifyToken } = require("./middleware/auth");
@@ -41,10 +40,15 @@ app.options('*', cors(corsOptions));
 app.use(helmet());
 app.use(compression());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
 app.use(hpp());
 app.use(xssClean());
+app.use(csrf({
+  cookie: {
+    httpOnly: true,
+    secure: false,
+    sameSite: "strict",
+  },
+}));
 app.use(morgan("combined"));
 
 // ✅ Rate Limiting
@@ -79,15 +83,6 @@ app.use(session({
   }
 }));
 
-// ✅ CSRF Protection
-app.use(csrf({
-  cookie: {
-    httpOnly: true,
-    secure: false,
-    sameSite: "strict",
-  },
-}));
-
 // ✅ Static Uploads
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
@@ -107,7 +102,6 @@ app.use("/api/uploads", require('./routes/api/uploads'));
 app.use("/api/properties", require('./routes/api/properties'));
 app.use("/api/test", require('./routes/api/testRedis'));
 app.use("/api/suggested", require("./routes/api/suggestedRoutes"));
-app.use("/api/google-maps", require('./routes/api/googleMapsTest')); // Google Maps testing and autocomplete
 
 
 // ✅ AI Routes
