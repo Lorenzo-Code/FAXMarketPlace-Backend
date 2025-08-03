@@ -90,7 +90,7 @@ app.use("/api/suggested", require("./routes/api/suggestedRoutes"));
 // ✅ AI Routes
 const searchRouter = require('./routes/api/ai/search');
 const pipelineRouter = require('./routes/api/ai/pipeline');
-app.use("/api/ai", searchRouter);                                 // POST /api/ai - Main AI search endpoint
+app.use("/api/ai/search", searchRouter);                         // POST /api/ai/search - Main AI search endpoint
 app.use("/api/ai", pipelineRouter);                              // POST /api/ai/pipeline + POST /api/ai/reset
 app.use("/api/ai/full-comp", require("./routes/api/ai/fullComp")); // POST /api/ai/full-comp - Full property report
 app.use("/api/ai/fast-comp", require('./routes/api/ai/fastComp')); // GET /api/ai/fast-comp - Lightweight property details

@@ -18,7 +18,116 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "Missing or invalid query" });
   }
 
-  // 🔍 Ask GPT to extract structured filters
+  // 📍 Check if this is a specific address search (from Google Places)
+  // Address searches should return exactly one property, not a city-wide search
+  const isAddressSearch = query.includes(',') && 
+    (query.match(/\d/) && (query.includes('St') || query.includes('Ave') || query.includes('Dr') || 
+     query.includes('Rd') || query.includes('Ct') || query.includes('Ln') || query.includes('Way') ||
+     query.includes('Street') || query.includes('Avenue') || query.includes('Drive') || 
+     query.includes('Road') || query.includes('Court') || query.includes('Lane')));
+
+  if (isAddressSearch) {
+    console.log('🏠 Detected specific address search:', query);
+    
+    // Extract just the address from natural language queries
+    let cleanedQuery = query;
+    // Remove common natural language prefixes
+    const prefixPatterns = [
+      /^show me detailed information for the property at\s*/i,
+      /^get me information about\s*/i,
+      /^find details for\s*/i,
+      /^lookup\s*/i,
+      /^search for\s*/i
+    ];
+    
+    for (const pattern of prefixPatterns) {
+      cleanedQuery = cleanedQuery.replace(pattern, '');
+    }
+    
+    console.log('🧹 Cleaned address query:', cleanedQuery);
+    
+    // Parse the address components
+    const addressParts = cleanedQuery.split(',').map(s => s.trim());
+    if (addressParts.length >= 3) {
+      const street = addressParts[0];
+      const city = addressParts[1];
+      const stateZip = addressParts[2];
+      
+      console.log('📍 Address components:', { street, city, stateZip });
+      
+      // For address searches, use CoreLogic to get the specific property
+      const { CoreLogicSuperClient } = require('../../../utils/coreLogicSuperClient');
+      const superClient = new CoreLogicSuperClient();
+      
+      try {
+        const specificProperty = await superClient.searchAndEnrich({
+          streetAddress: street,
+          city: city,
+          state: stateZip.split(' ')[0],
+          zipCode: stateZip.split(' ')[1]
+        });
+        
+        if (specificProperty) {
+          console.log('✅ Found specific property via CoreLogic');
+          return res.status(200).json({
+            fromCache: false,
+            filters: { address: query },
+            listings: [{
+              id: specificProperty.id || 'single_property',
+              address: { oneLine: query },
+              price: specificProperty.valuation?.currentValue || specificProperty.price,
+              beds: specificProperty.structure?.bedrooms || specificProperty.beds,
+              baths: specificProperty.structure?.bathrooms || specificProperty.baths,
+              sqft: specificProperty.structure?.squareFeet || specificProperty.sqft,
+              location: {
+                latitude: specificProperty.location?.latitude,
+                longitude: specificProperty.location?.longitude
+              },
+              imgSrc: specificProperty.imgSrc || null,
+              dataSource: 'corelogic',
+              dataQuality: 'excellent'
+            }],
+            metadata: {
+              searchQuery: query,
+              searchType: 'address',
+              totalFound: 1,
+              timestamp: new Date().toISOString()
+            },
+            ai_summary: `Found the specific property at ${query}. This is a detailed view of this exact address.`
+          });
+        }
+      } catch (error) {
+        console.warn('⚠️ CoreLogic address search failed:', error.message);
+        // Fallback to mock data for now
+        return res.status(200).json({
+          fromCache: false,
+          filters: { address: query },
+          listings: [{
+            id: 'address_search_result',
+            address: { oneLine: query },
+            price: null,
+            beds: null,
+            baths: null,
+            sqft: null,
+            location: { latitude: null, longitude: null },
+            imgSrc: null,
+            dataSource: 'address_search',
+            dataQuality: 'partial',
+            note: 'Specific address data unavailable - property may not be listed or in our database'
+          }],
+          metadata: {
+            searchQuery: query,
+            searchType: 'address',
+            totalFound: 1,
+            timestamp: new Date().toISOString()
+          },
+          ai_summary: `This appears to be a search for the specific address: ${query}. However, detailed property information is not currently available in our database. This could mean the property is not currently for sale or not in our data sources.`
+        });
+      }
+    }
+  }
+
+  // 🔍 Ask GPT to extract structured filters (for non-address searches)
   let parsedFilter = {};
   try {
     const completion = await openai.chat.completions.create({
@@ -96,66 +205,142 @@ router.post("/", async (req, res) => {
     property_type
   });
 
-  // 🏠 Zillow Search with Enhanced Caching
-  const zillowParams = new URLSearchParams({
-    location: normalizedCity,
-    priceMax: max_price,
-    bedsMin: min_beds,
-    home_type: property_type,
-    status_type: "ForSale",
-  });
-
-  // 💾 Create specific cache key for Zillow search results
-  const zillowCacheKey = `zillow:search:${normalizedCity}:${max_price}:${min_beds}:${property_type}`;
+  // 🏆 OPTIMIZED APPROACH: CoreLogic First for Property Intelligence, then Zillow for Images
+  // This saves costs by getting reliable property data first, then enhancing with visual content
   
-  let zillowData;
+  // 🏠 First: Get comprehensive property search from CoreLogic (CACHED)
+  console.log('🎯 Phase 1: Getting comprehensive property intelligence from CoreLogic...');
+  const { coreLogicCache } = require('../../../utils/coreLogicCacheWrapper');
   
-  // 📥 Check cache first - this saves expensive Zillow API calls!
-  const cachedZillow = await getAsync(zillowCacheKey);
-  if (cachedZillow) {
-    console.log(`📥 Cache hit for Zillow search: ${normalizedCity}`);
+  let coreLogicProperties = [];
+  const coreLogicCacheKey = `corelogic:search:comprehensive:${normalizedCity}:${max_price}:${min_beds}:${property_type}`;
+  
+  // Check cache for CoreLogic comprehensive search
+  const cachedCoreLogic = await getAsync(coreLogicCacheKey);
+  if (cachedCoreLogic) {
+    console.log(`💰 CoreLogic cache hit - saved expensive API calls!`);
     try {
-      zillowData = JSON.parse(cachedZillow);
+      coreLogicProperties = JSON.parse(cachedCoreLogic);
     } catch (parseError) {
-      console.warn(`⚠️ Failed to parse cached Zillow data, fetching fresh data:`, parseError.message);
-      // Clear the corrupted cache entry
+      console.warn(`⚠️ Failed to parse cached CoreLogic data, fetching fresh:`, parseError.message);
       const { deleteAsync } = require("../../../utils/redisClient");
-      await deleteAsync(zillowCacheKey);
-      // Fall through to fetch fresh data
+      await deleteAsync(coreLogicCacheKey);
     }
   }
   
-  if (!zillowData) {
-    // 🔍 Make API call if not cached
-    const zillowUrl = `https://zillow-com1.p.rapidapi.com/propertyExtendedSearch?${zillowParams.toString()}`;
+  // If no cached data, use CoreLogic SuperClient to search for properties
+  if (!coreLogicProperties || coreLogicProperties.length === 0) {
+    console.log('🔥 CoreLogic cache miss - making API call...');
+    const { CoreLogicSuperClient } = require('../../../utils/coreLogicSuperClient');
+    const superClient = new CoreLogicSuperClient();
     
     try {
-      const zillowResponse = await fetch(zillowUrl, {
-        method: "GET",
-        headers: {
-          "x-rapidapi-key": process.env.RAPIDAPI_KEY,
-          "x-rapidapi-host": "zillow-com1.p.rapidapi.com",
-        },
+      // Use CoreLogic's comprehensive property search
+      const searchResult = await coreLogicCache.getCachedPropertySearch({
+        city: normalizedCity,
+        state: 'TX', // Default to TX since most searches are Houston-based
+        maxPrice: max_price,
+        minBedrooms: min_beds,
+        propertyType: property_type === 'house' ? 'SFR' : property_type.toUpperCase(),
+        limit: 20 // Get top 20 properties from CoreLogic
       });
-
-      if (!zillowResponse.ok) {
-        const text = await zillowResponse.text();
-        return res.status(502).json({ error: "Zillow API failed", details: text });
+      
+      coreLogicProperties = searchResult?.properties || [];
+      
+      // Cache the results for 30 minutes (property searches change moderately)
+      if (coreLogicProperties.length > 0) {
+        await setAsync(coreLogicCacheKey, coreLogicProperties, 1800);
+        console.log(`📝 Cached ${coreLogicProperties.length} CoreLogic properties`);
       }
-
-      zillowData = await zillowResponse.json();
       
-      // 💾 Cache Zillow search results for 15 minutes (property listings change frequently)
-      await setAsync(zillowCacheKey, zillowData, 900);
-      console.log(`📝 Cached Zillow search results for: ${normalizedCity}`);
-      
-    } catch (err) {
-      return res.status(502).json({ error: "Zillow API unreachable", details: err.message });
+    } catch (coreLogicError) {
+      console.warn('⚠️ CoreLogic search failed, falling back to Zillow-first approach:', coreLogicError.message);
+      // Fallback to original Zillow-first approach if CoreLogic fails
+      coreLogicProperties = [];
     }
   }
+  
+  let rawListings = [];
+  
+  // If we got properties from CoreLogic, use them as the primary source
+  if (coreLogicProperties.length > 0) {
+    console.log(`✅ Using ${coreLogicProperties.length} properties from CoreLogic as primary data source`);
+    rawListings = coreLogicProperties.map(prop => ({
+      // Map CoreLogic data to Zillow-like format for compatibility
+      address: prop.address?.oneLine || `${prop.address?.street}, ${prop.address?.city}, ${prop.address?.state}`,
+      price: prop.valuation?.currentValue || prop.assessedValue || prop.listPrice,
+      bedrooms: prop.structure?.bedrooms || prop.beds,
+      bathrooms: prop.structure?.bathrooms || prop.baths,
+      latitude: prop.location?.latitude,
+      longitude: prop.location?.longitude,
+      sqft: prop.structure?.squareFeet || prop.structure?.livingArea,
+      yearBuilt: prop.structure?.yearBuilt,
+      propertyType: prop.structure?.propertyType,
+      zpid: null, // Will be populated when we fetch Zillow images
+      imgSrc: null, // Will be populated from Zillow
+      coreLogicData: prop, // Keep full CoreLogic data for enrichment
+      dataSource: 'corelogic'
+    }));
+  } else {
+    // Fallback: Use Zillow search if CoreLogic didn't return results
+    console.log('📋 Falling back to Zillow search as CoreLogic returned no results');
+    
+    const zillowParams = new URLSearchParams({
+      location: normalizedCity,
+      priceMax: max_price,
+      bedsMin: min_beds,
+      home_type: property_type,
+      status_type: "ForSale",
+    });
 
-  const rawListings = zillowData.props || [];
-  console.log(`📦 Found ${rawListings.length} listings from Zillow`);
+    const zillowCacheKey = `zillow:search:${normalizedCity}:${max_price}:${min_beds}:${property_type}`;
+    let zillowData;
+    
+    const cachedZillow = await getAsync(zillowCacheKey);
+    if (cachedZillow) {
+      console.log(`📥 Cache hit for Zillow search: ${normalizedCity}`);
+      try {
+        zillowData = JSON.parse(cachedZillow);
+      } catch (parseError) {
+        console.warn(`⚠️ Failed to parse cached Zillow data, fetching fresh data:`, parseError.message);
+        const { deleteAsync } = require("../../../utils/redisClient");
+        await deleteAsync(zillowCacheKey);
+      }
+    }
+    
+    if (!zillowData) {
+      const zillowUrl = `https://zillow-com1.p.rapidapi.com/propertyExtendedSearch?${zillowParams.toString()}`;
+      
+      try {
+        const zillowResponse = await fetch(zillowUrl, {
+          method: "GET",
+          headers: {
+            "x-rapidapi-key": process.env.RAPIDAPI_KEY,
+            "x-rapidapi-host": "zillow-com1.p.rapidapi.com",
+          },
+        });
+
+        if (!zillowResponse.ok) {
+          const text = await zillowResponse.text();
+          return res.status(502).json({ error: "Both CoreLogic and Zillow searches failed", details: text });
+        }
+
+        zillowData = await zillowResponse.json();
+        await setAsync(zillowCacheKey, zillowData, 900);
+        console.log(`📝 Cached Zillow search results for: ${normalizedCity}`);
+        
+      } catch (err) {
+        return res.status(502).json({ error: "Both CoreLogic and Zillow APIs unreachable", details: err.message });
+      }
+    }
+
+    rawListings = (zillowData.props || []).map(prop => ({ 
+      ...prop, 
+      dataSource: 'zillow' 
+    }));
+  }
+  
+  console.log(`📦 Found ${rawListings.length} listings (${rawListings[0]?.dataSource || 'unknown'} source)`);
 
   // 🧠 Enhanced property data processing with comprehensive validation and fallbacks
   let enrichedListings = [];
@@ -170,7 +355,41 @@ router.post("/", async (req, res) => {
     hasBedsAndBaths: 0
   };
   
-  console.log(`📊 Starting to process ${rawListings.length} raw listings from Zillow`);
+  console.log(`📊 Phase 2: Starting to process ${rawListings.length} listings and enhance with Zillow images`);
+  
+  // 🖼️ If we have CoreLogic properties, enhance them with Zillow images
+  if (rawListings.length > 0 && rawListings[0]?.dataSource === 'corelogic') {
+    console.log('🎨 Phase 2a: Enhancing CoreLogic properties with Zillow images...');
+    const { fetchZillowPhotos } = require('../../../services/fetchZillow');
+    
+    // Process properties to get Zillow images
+    for (const [index, property] of rawListings.slice(0, 5).entries()) {
+      try {
+        if (property.address && property.coreLogicData?.address?.zip) {
+          console.log(`🖼️ Fetching Zillow images for: ${property.address}`);
+          const zillowImages = await fetchZillowPhotos(
+            property.coreLogicData.address.street || property.address, 
+            property.coreLogicData.address.zip
+          );
+          
+          if (zillowImages && zillowImages.length > 0) {
+            property.imgSrc = zillowImages[0].imgSrc;
+            property.zpid = zillowImages[0].zpid;
+            console.log(`✅ Enhanced property ${index + 1} with Zillow image`);
+          } else {
+            console.log(`⚠️ No Zillow images found for property ${index + 1}`);
+          }
+        }
+      } catch (imageError) {
+        console.warn(`⚠️ Failed to fetch Zillow images for property ${index + 1}:`, imageError.message);
+      }
+      
+      // Add small delay to respect API rate limits
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    console.log('✅ Phase 2a completed: CoreLogic properties enhanced with Zillow images');
+  }
   
   for (const [index, p] of rawListings.slice(0, 10).entries()) {
     dataQualityStats.totalProcessed++;
