@@ -4,6 +4,7 @@ const { fetchZillowPhotos } = require("../../../services/fetchZillow");
 const { getPropertyInfoFromCoreLogic } = require("../../../utils/coreLogicClientV2");
 const { CoreLogicSuperClient } = require("../../../utils/coreLogicSuperClient");
 const { getAsync, setAsync } = require("../../../utils/redisClient");
+const { coreLogicCache } = require("../../../utils/coreLogicCacheWrapper");
 
 const Property = require("../../../models/Property");
 const router = express.Router();
@@ -82,9 +83,9 @@ router.post("/pipeline", async (req, res) => {
       { role: "assistant", content: assistantReply }
     ];
 
-    // 📍 Enrich via CoreLogic + Zillow
+    // 📍 Enrich via CACHED CoreLogic + Zillow (COST SAVINGS!)
     const [coreData, zillowImages] = await Promise.all([
-      getPropertyInfoFromCoreLogic({ address1, city, state, postalcode, lat: finalLat, lng: finalLng }),
+      coreLogicCache.getCachedPropertyInfo({ address1, city, state, postalcode, lat: finalLat, lng: finalLng }),
       fetchZillowPhotos(address1, postalcode)
     ]);
 
@@ -184,11 +185,11 @@ router.post("/comprehensive", async (req, res) => {
 
     console.log(`🔍 Starting comprehensive property search for: ${address1}, ${city}, ${state}`);
 
-    // Use Super Client for comprehensive search and enrichment
-    console.log('🌐 Calling superClient.searchAndEnrich...');
+    // Use Super Client for comprehensive search and enrichment WITH CACHING
+    console.log('🌐 Calling CACHED superClient.searchAndEnrich...');
     let comprehensiveResult;
     try {
-      comprehensiveResult = await superClient.searchAndEnrich({
+      comprehensiveResult = await coreLogicCache.getCachedPropertySearch({
         streetAddress: address1,
         city,
         state,
