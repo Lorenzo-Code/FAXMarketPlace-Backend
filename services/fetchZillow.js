@@ -11,15 +11,15 @@ const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 // Caches ZPIDs locally
 const zpidCache = new Map();
 
-async function getZpidFromAddress(address) {
-  console.log(`📬 Fetching ZPID for: ${address}`);
+async function getZpidFromaddress1(address1) {
+  console.log(`📬 Fetching ZPID for: ${address1}`);
   try {
     const { data } = await axios.get("https://zillow-com1.p.rapidapi.com/property", {
       headers: {
         "X-RapidAPI-Key": process.env.RAPIDAPI_KEY,
         "X-RapidAPI-Host": process.env.RAPIDAPI_HOST,
       },
-      params: { address },
+      params: { address1 },
     });
 
     const zpid = data?.zpid;
@@ -50,9 +50,9 @@ async function getImagesByZpid(zpid) {
 }
 
 
-async function fetchZillowPhotos(addressLine, zip) {
-  const fullAddress = `${addressLine}, Houston, TX ${zip}`;
-  const normalizedKey = `zillow:photo:${fullAddress.replace(/\s+/g, "").toLowerCase()}`;
+async function fetchZillowPhotos(address1Line, zip) {
+  const fulladdress1 = `${address1Line}, Houston, TX ${zip}`;
+  const normalizedKey = `zillow:photo:${fulladdress1.replace(/\s+/g, "").toLowerCase()}`;
 
   // 📊 Analytics keys
   const hitsKey = "zillow:stats:hits";
@@ -63,7 +63,7 @@ async function fetchZillowPhotos(addressLine, zip) {
   if (cached) {
     console.log(`⚡ Redis Cache Hit: ${normalizedKey}`);
     await incrementCounter(hitsKey);
-    return [{ address: fullAddress, imgSrc: cached, zpid: null }];
+    return [{ address1: fulladdress1, imgSrc: cached, zpid: null }];
   }
 
   // ❌ Cache Miss
@@ -71,15 +71,15 @@ async function fetchZillowPhotos(addressLine, zip) {
   await incrementCounter(missesKey);
 
   // Proceed with ZPID lookup and fetch
-  let zpid = zpidCache.get(fullAddress);
+  let zpid = zpidCache.get(fulladdress1);
   if (!zpid) {
     await delay(300);
-    zpid = await limit(() => getZpidFromAddress(fullAddress));
-    if (zpid) zpidCache.set(fullAddress, zpid);
+    zpid = await limit(() => getZpidFromaddress1(fulladdress1));
+    if (zpid) zpidCache.set(fulladdress1, zpid);
   }
 
   if (!zpid) {
-    console.warn(`❌ No ZPID found for: ${fullAddress}`);
+    console.warn(`❌ No ZPID found for: ${fulladdress1}`);
     return [];
   }
 
@@ -87,11 +87,11 @@ async function fetchZillowPhotos(addressLine, zip) {
   const images = await limit(() => getImagesByZpid(zpid));
   if (images.length > 0) {
     await setAsync(normalizedKey, images[0]); // Cache one image
-    console.log(`📸 Image cached for: ${fullAddress}`);
+    console.log(`📸 Image cached for: ${fulladdress1}`);
   }
 
   return images.map((imgSrc) => ({
-    address: fullAddress,
+    address1: fulladdress1,
     imgSrc,
     zpid,
   }));

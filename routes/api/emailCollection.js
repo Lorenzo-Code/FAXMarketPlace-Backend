@@ -2,6 +2,7 @@ const express = require("express");
 const axios = require("axios");
 const router = express.Router();
 const Subscriber = require("../../models/Subscriber");
+const { getAsync, setAsync, getUserKey } = require("../../utils/redisClient");
 
 const MAILERLITE_API_URL = "https://connect.mailerlite.com/api/subscribers";
 
@@ -13,13 +14,21 @@ const GROUP_IDS = {
 
 // ✅ Only allow predefined contexts
 const ALLOWED_CONTEXTS = Object.keys(GROUP_IDS);
-
-// ✅ Subscribe Route
+// ✅ Subscribe Route with rate limiting to improve user UX
 router.post("/subscribe", async (req, res) => {
   const { email, name = "", wallet = "", context = "newsletter" } = req.body;
 
   if (!email || !email.includes("@")) {
     return res.status(400).json({ error: "A valid email is required." });
+  }
+
+  const userKey = getUserKey(req);
+  const subscribeKey = `subscribe:limit:${userKey}`;
+  
+  // 📥 Rate limit cache check
+  const limitReached = await getAsync(subscribeKey);
+  if (limitReached) {
+    return res.status(429).json({ error: "Too many subscription attempts. Please try again later." });
   }
 
   const safeContext = ALLOWED_CONTEXTS.includes(context) ? context : "newsletter";
@@ -54,6 +63,9 @@ router.post("/subscribe", async (req, res) => {
       wallet: wallet ? wallet.toLowerCase() : undefined,
       context: safeContext,
     });
+
+    // 📝 Set a rate limit key for 30 seconds to prevent spam while allowing retries
+    await setAsync(subscribeKey, true, 30);
 
     return res.status(200).json({
       message: "🎉 Confirmation email sent! Please check your inbox.",

@@ -1,24 +1,48 @@
 const express = require("express");
 const BlogPost = require("../../models/BlogPost");
 const mongoose = require("mongoose");
+const { getAsync, setAsync, deletePatternAsync, getUserKey } = require("../../utils/redisClient");
 
 const router = express.Router();
 
-// GET all blogs
+// GET all blogs with caching for SEO performance
 router.get('/', async (req, res) => {
   try {
+    const cacheKey = 'blog:listing:all';
+    
+    // 📥 Check cache first (great for SEO since blog lists don't change often)
+    const cached = await getAsync(cacheKey);
+    if (cached) {
+      console.log('📥 Cache hit for blog listing');
+      return res.json({ fromCache: true, ...JSON.parse(cached) });
+    }
+
     const blogs = await BlogPost.find().sort({ createdAt: -1 });
-    res.json({ blogs });
+    const responseData = { blogs };
+    
+    // 💾 Cache for 2 hours (blog listings change infrequently)
+    await setAsync(cacheKey, responseData, 7200);
+    console.log('📝 Cached blog listing');
+    
+    res.json({ fromCache: false, ...responseData });
   } catch (err) {
     console.error("Error fetching blogs:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-// GET single blog by slug
+// GET single blog by slug with aggressive caching for SEO
 router.get('/:idOrSlug', async (req, res) => {
   try {
     const { idOrSlug } = req.params;
+    const cacheKey = `blog:single:${idOrSlug}`;
+    
+    // 📥 Check cache first (excellent for SEO - blog posts rarely change)
+    const cached = await getAsync(cacheKey);
+    if (cached) {
+      console.log(`📥 Cache hit for blog: ${idOrSlug}`);
+      return res.json({ fromCache: true, ...JSON.parse(cached) });
+    }
 
     let blog;
     if (mongoose.Types.ObjectId.isValid(idOrSlug)) {
@@ -31,7 +55,11 @@ router.get('/:idOrSlug', async (req, res) => {
 
     if (!blog) return res.status(404).json({ error: 'Blog not found' });
 
-    res.json(blog);
+    // 💾 Cache individual blog posts for 2 hours (they rarely change)
+    await setAsync(cacheKey, blog, 7200);
+    console.log(`📝 Cached blog post: ${idOrSlug}`);
+
+    res.json({ fromCache: false, ...blog.toObject() });
   } catch (err) {
     console.error("Error fetching blog:", err);
     res.status(500).json({ error: "Server error" });
@@ -39,7 +67,7 @@ router.get('/:idOrSlug', async (req, res) => {
 });
 
 
-// POST create new blog (full save)
+// POST create new blog (full save) with cache invalidation
 router.post('/', async (req, res) => {
   const {
     title,
@@ -72,6 +100,11 @@ router.post('/', async (req, res) => {
     });
 
     await blog.save();
+    
+    // 🗑️ Invalidate blog listing cache when new blog is created
+    await deletePatternAsync('blog:listing:*');
+    console.log('🗑️ Invalidated blog listing cache after creation');
+    
     res.json({ success: true, created: true, blog });
   } catch (err) {
     console.error("Error creating blog:", err);
@@ -125,15 +158,22 @@ router.post('/autosave', async (req, res) => {
   }
 });
 
-// PUT update blog by ID
+// PUT update blog by ID with cache invalidation
 router.put('/:id', async (req, res) => {
   try {
+    const original = await BlogPost.findById(req.params.id);
+    if (!original) return res.status(404).json({ error: 'Blog not found' });
+    
     const updated = await BlogPost.findByIdAndUpdate(req.params.id, {
       ...req.body,
       updatedAt: new Date()
     }, { new: true });
 
-    if (!updated) return res.status(404).json({ error: 'Blog not found' });
+    // 🗑️ Invalidate specific blog and listing caches
+    await deletePatternAsync(`blog:single:${original._id}`);
+    await deletePatternAsync(`blog:single:${original.slug}`);
+    await deletePatternAsync('blog:listing:*');
+    console.log(`🗑️ Invalidated cache for updated blog: ${original.slug}`);
 
     res.json(updated);
   } catch (err) {
@@ -142,9 +182,18 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// DELETE blog
+// DELETE blog with cache invalidation
 router.delete('/:id', async (req, res) => {
   try {
+    const blog = await BlogPost.findById(req.params.id);
+    if (blog) {
+      // 🗑️ Invalidate specific blog and listing caches before deletion
+      await deletePatternAsync(`blog:single:${blog._id}`);
+      await deletePatternAsync(`blog:single:${blog.slug}`);
+      await deletePatternAsync('blog:listing:*');
+      console.log(`🗑️ Invalidated cache for deleted blog: ${blog.slug}`);
+    }
+    
     await BlogPost.findByIdAndDelete(req.params.id);
     res.json({ success: true });
   } catch (err) {

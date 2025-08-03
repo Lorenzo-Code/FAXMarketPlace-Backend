@@ -3,11 +3,54 @@ const router = express.Router();
 const User = require("../models/User");
 const { verifyToken, authorizeAdmin } = require("../middleware/auth");
 
+
 // ✅ Dashboard Route
 router.get("/dashboard", verifyToken, authorizeAdmin, (req, res) => {
-  console.log("🔐 Admin Access:", req.user);
-  res.json({ message: "Welcome to the admin dashboard." });
+  const userKey = req.user?.id || req.sessionID || "guest";
+  console.log("🔐 Admin Access:", req.user, "| Cache/User Key:", userKey);
+
+  // Return mock dashboard data that the frontend expects
+  res.json({
+    message: "Welcome to the admin dashboard.",
+    totalUsers: 150,
+    verifiedUsers: 120,
+    tokenTransfers: 2450,
+    activeSubscriptions: 85,
+    userTrends: [
+      { week: "Week 1", count: 25 },
+      { week: "Week 2", count: 30 },
+      { week: "Week 3", count: 35 },
+      { week: "Week 4", count: 40 }
+    ],
+    tokenVolume: [
+      { date: "Mon", volume: 1200 },
+      { date: "Tue", volume: 1800 },
+      { date: "Wed", volume: 1500 },
+      { date: "Thu", volume: 2100 },
+      { date: "Fri", volume: 1900 }
+    ],
+    revenueTrends: [
+      { month: "Jan", revenue: 15000 },
+      { month: "Feb", revenue: 18000 },
+      { month: "Mar", revenue: 22000 },
+      { month: "Apr", revenue: 25000 }
+    ],
+    reportUsage: [
+      { day: "Mon", reports: 45 },
+      { day: "Tue", reports: 52 },
+      { day: "Wed", reports: 38 },
+      { day: "Thu", reports: 65 },
+      { day: "Fri", reports: 58 }
+    ],
+    activityFeed: [
+      { icon: "👤", time: "2 min ago", message: "New user registered: john@example.com" },
+      { icon: "💰", time: "5 min ago", message: "Token transfer completed: 1,500 FXCT" },
+      { icon: "🏠", time: "10 min ago", message: "Property uploaded for review" },
+      { icon: "📊", time: "15 min ago", message: "Weekly report generated" }
+    ]
+  });
 });
+
 
 // ✅ Get All Users
 router.get("/users", verifyToken, authorizeAdmin, async (req, res) => {

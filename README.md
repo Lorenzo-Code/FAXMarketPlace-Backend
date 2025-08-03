@@ -1,3 +1,13 @@
+## Tests
+
+Your project includes several tests organized as follows:
+
+- **CoreLogic Tests**: Located in `tests/corelogic/`, these test the CoreLogic utilities and integration.
+- **AI Tests**: Located in `tests/ai/`, these include tests for AI search functionalities.
+- **Examples**: Found in `tests/examples/`, showcasing implementations and demos.
+
+To run your tests, navigate to the appropriate directory and execute the test files using Node.js or PowerShell depending on the file type.
+
 ## Getting Started
 
 We provide a sample app using Node.js that you can deploy on App Platform. These steps will get this sample application running for you using App Platform.
@@ -45,6 +55,10 @@ Here's an example code change you can make for this app:
 ### Learn More
 
 You can learn more about the App Platform and how to manage and update your application at https://www.digitalocean.com/docs/app-platform/.
+
+## Documentation
+
+Explore the full documentation [here](./docs/README.md) for detailed insights into caching, CoreLogic integration, and more.
 
 ## Deleting the App
 

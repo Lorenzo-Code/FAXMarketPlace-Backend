@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const userKey = req.user?.id || req.sessionID || "guest";
+
 
 // GET /api/session/history
 router.get('/', (req, res) => {

@@ -4,10 +4,11 @@ const { updateTask, getTaskById, createTask } = require("../models/taskModel");
 const { sendHelpScoutReply } = require("../utils/helpscoutClient");
 const { postSlackReply, postTicketToSlack } = require("../utils/slackClient");
 
-// Reply to a ticket (resolve + notify)
+// 🎫 Reply to a ticket (resolve + notify customer + post to Slack)
 router.post("/:id/reply", async (req, res) => {
   const taskId = parseInt(req.params.id);
   const { resolutionNote, responderName } = req.body;
+  const userKey = req.user?.id || req.sessionID || "guest";
 
   try {
     const task = await getTaskById(taskId);
@@ -26,30 +27,38 @@ router.post("/:id/reply", async (req, res) => {
     });
 
     if (task.slackThreadTs) {
-      await postSlackReply(task.slackThreadTs, `✅ Task #${taskId} resolved by ${responderName}\n📝 ${resolutionNote}`);
+      await postSlackReply(
+        task.slackThreadTs,
+        `✅ Task #${taskId} resolved by ${responderName}\n📝 ${resolutionNote}`
+      );
     }
 
+    console.log(`📩 [${userKey}] Ticket #${taskId} resolved.`);
     res.status(200).json({ success: true });
   } catch (err) {
-    console.error("Reply error:", err);
-    res.status(500).json({ error: "Internal error" });
+    console.error("❌ Ticket reply error:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// Create new ticket and task
+// 🆕 Create a new ticket + backend task + Slack thread
 router.post("/create", async (req, res) => {
+  const {
+    ticketId,
+    subject,
+    email,
+    body,
+    tag = "general",
+    assignedTo = "Support",
+  } = req.body;
+
+  const userKey = req.user?.id || req.sessionID || "guest";
+
   try {
-    const {
-      ticketId,
-      subject,
-      email,
-      body,
-      tag = "general",
-      assignedTo = "Support",
-    } = req.body;
+    const taskId = Date.now();
 
     const newTask = {
-      id: Date.now(),
+      id: taskId,
       text: `${tag.toUpperCase()} issue from ${email}`,
       ticketId,
       tag,
@@ -67,14 +76,15 @@ router.post("/create", async (req, res) => {
       email,
       subject,
       body,
-      taskId: newTask.id,
+      taskId,
     });
 
-    await updateTask(newTask.id, { slackThreadTs });
+    await updateTask(taskId, { slackThreadTs });
 
-    res.status(200).json({ success: true, taskId: newTask.id });
+    console.log(`📨 [${userKey}] Created ticket task #${taskId} for ${email}`);
+    res.status(200).json({ success: true, taskId });
   } catch (err) {
-    console.error("Ticket hook error:", err);
+    console.error("❌ Ticket creation error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
