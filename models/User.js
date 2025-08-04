@@ -58,6 +58,19 @@ const UserSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // 🔴 Real-time tracking fields
+    isOnline: {
+      type: Boolean,
+      default: false,
+    },
+    lastSeen: {
+      type: Date,
+      default: Date.now,
+    },
+    sessionId: {
+      type: String,
+      default: null,
+    },
     createdAt: {
       type: Date,
       default: Date.now,

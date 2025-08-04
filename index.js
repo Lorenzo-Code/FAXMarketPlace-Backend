@@ -1,6 +1,8 @@
 require("dotenv").config();
 
 const express = require("express");
+const http = require("http");
+const socketIo = require("socket.io");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
@@ -15,14 +17,29 @@ const cookieParser = require("cookie-parser");
 const path = require("path");
 
 const { verifyToken } = require("./middleware/auth");
+const { trackUserSession } = require("./middleware/sessionTracking");
 const { initRateLimiters } = require("./middleware/rateLimiterRedis");
 const { ensureConnected } = require("./utils/redisClient");
+const realTimeAnalytics = require("./services/realTimeAnalytics");
 
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:3001', 'https://fractionax.io'],
+    methods: ["GET", "POST"]
+  }
+});
 const PORT = process.env.PORT || 5000;
 
 // 🔐 CORS Configuration
-const allowedOrigins = ['http://localhost:5173', 'https://fractionax.io'];
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173', 
+  'http://localhost:5174',
+  'http://localhost:3001',
+  'https://fractionax.io'
+];
 const corsOptions = {
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -120,6 +137,24 @@ app.use("/api/ai/full-comp", require("./routes/api/ai/fullComp")); // POST /api/
 app.use("/api/ai/fast-comp", require('./routes/api/ai/fastComp')); // GET /api/ai/fast-comp - Lightweight property details
 app.use("/api/ai/smart-search", require('./routes/api/ai/smartSearch')); // GET /api/ai/smart-search - Smart AI search
 
+// ✅ WebSocket Configuration
+io.on('connection', (socket) => {
+  console.log('🔌 New WebSocket connection:', socket.id);
+  
+  // Join admin room for real-time updates
+  socket.on('join-admin', () => {
+    socket.join('admin-dashboard');
+    console.log('👨‍💼 Socket joined admin dashboard:', socket.id);
+  });
+  
+  socket.on('disconnect', () => {
+    console.log('🔌 WebSocket disconnected:', socket.id);
+  });
+});
+
+// Make io available globally for broadcasting updates
+global.io = io;
+
 // ✅ Health Check
 app.get("/", (req, res) => {
   res.status(200).json({ status: "✅ FractionaX Backend API is live", csrfToken: req.csrfToken() });
@@ -139,8 +174,13 @@ app.use((req, res) => {
 (async () => {
   try {
     await ensureConnected();
-    app.listen(PORT, '0.0.0.0', () => {
+    server.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
+      console.log('🔌 WebSocket server initialized');
+      
+      // Start real-time analytics service
+      realTimeAnalytics.start();
+      console.log('📊 Real-time analytics service started');
     });
   } catch (err) {
     console.error("🛑 Startup error:", err);
