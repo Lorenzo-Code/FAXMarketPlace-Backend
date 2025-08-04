@@ -8,7 +8,7 @@ const rateLimit = require("express-rate-limit");
 const hpp = require("hpp");
 const xssClean = require("xss-clean");
 const compression = require("compression");
-const csrf = require("csurf");
+const csrf = require("csrf");
 const mongoose = require("mongoose");
 const session = require("express-session");
 const cookieParser = require("cookie-parser");
@@ -80,13 +80,14 @@ app.use(session({
 }));
 
 // ✅ CSRF Protection
-app.use(csrf({
-  cookie: {
-    httpOnly: true,
-    secure: false,
-    sameSite: "strict",
-  },
-}));
+const tokens = new csrf();
+const secret = tokens.secretSync();
+
+// CSRF middleware
+app.use((req, res, next) => {
+  req.csrfToken = () => tokens.create(secret);
+  next();
+});
 
 // ✅ Static Uploads
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
