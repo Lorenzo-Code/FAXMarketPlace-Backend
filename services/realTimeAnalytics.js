@@ -79,7 +79,7 @@ class RealTimeAnalyticsService {
 
     // Recent activity (last 10 activities)
     const recentActivity = await AuditLog.find()
-      .populate('user', 'email firstName lastName')
+      .populate('userId', 'email firstName lastName')
       .sort({ createdAt: -1 })
       .limit(10)
       .lean();
@@ -105,8 +105,8 @@ class RealTimeAnalyticsService {
       recentActivity: recentActivity.map(activity => ({
         id: activity._id,
         type: activity.event || activity.type,
-        user: activity.user ? `${activity.user.firstName} ${activity.user.lastName}` : 'System',
-        email: activity.user?.email,
+        user: activity.userId ? `${activity.userId.firstName} ${activity.userId.lastName}` : 'System',
+        email: activity.userId?.email,
         message: this.formatActivityMessage(activity),
         timestamp: activity.createdAt || activity.timestamp,
         icon: this.getActivityIcon(activity.event || activity.type)
