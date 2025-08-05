@@ -8,7 +8,12 @@ class RealTimeAnalyticsService {
   constructor() {
     this.isRunning = false;
     this.interval = null;
-    this.updateFrequency = 15000; // 15 seconds
+    this.updateFrequency = 60000; // 1 minute
+    this.cache = {
+      data: null,
+      lastUpdated: null,
+      ttl: 50000 // 50 seconds cache TTL
+    };
   }
 
   async start() {
@@ -39,7 +44,20 @@ class RealTimeAnalyticsService {
     try {
       if (!global.io) return;
 
+      // Check if we have valid cached data
+      const now = Date.now();
+      if (this.cache.data && this.cache.lastUpdated && 
+          (now - this.cache.lastUpdated) < this.cache.ttl) {
+        console.log('📊 Using cached analytics data');
+        global.io.to('admin-dashboard').emit('analytics-update', this.cache.data);
+        return;
+      }
+
       const analytics = await this.generateAnalytics();
+      
+      // Update cache
+      this.cache.data = analytics;
+      this.cache.lastUpdated = now;
       
       // Broadcast to all connected admin clients
       global.io.to('admin-dashboard').emit('analytics-update', analytics);
@@ -56,36 +74,36 @@ class RealTimeAnalyticsService {
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-    // Core metrics
-    const totalUsers = await User.countDocuments();
-    const activeUsers = await User.countDocuments({ 
-      lastLogin: { $gte: thirtyDaysAgo } 
-    });
-    const verifiedUsers = await User.countDocuments({ emailVerified: true });
-    const newUsersToday = await User.countDocuments({ 
-      createdAt: { $gte: oneDayAgo } 
-    });
-    const newUsersThisWeek = await User.countDocuments({ 
-      createdAt: { $gte: sevenDaysAgo } 
-    });
-
-    // Property metrics
-    const totalProperties = await Property.countDocuments();
-    const approvedProperties = await Property.countDocuments({ status: 'approved' });
-    const pendingProperties = await Property.countDocuments({ status: 'pending' });
-
-    // Real-time session data
-    const realTimeStats = await getRealTimeStats();
-
-    // Recent activity (last 10 activities)
-    const recentActivity = await AuditLog.find()
-      .populate('userId', 'email firstName lastName')
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean();
-
-    // Activity trends (last 7 days)
-    const activityTrends = await this.getActivityTrends();
+    // Optimize queries by running them in parallel
+    const [
+      totalUsers,
+      activeUsers,
+      verifiedUsers,
+      newUsersToday,
+      newUsersThisWeek,
+      totalProperties,
+      approvedProperties,
+      pendingProperties,
+      realTimeStats,
+      recentActivity,
+      activityTrends
+    ] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ lastLogin: { $gte: thirtyDaysAgo } }),
+      User.countDocuments({ emailVerified: true }),
+      User.countDocuments({ createdAt: { $gte: oneDayAgo } }),
+      User.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
+      Property.countDocuments(),
+      Property.countDocuments({ status: 'approved' }),
+      Property.countDocuments({ status: 'pending' }),
+      getRealTimeStats(),
+      AuditLog.find()
+        .populate('userId', 'email firstName lastName')
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean(),
+      this.getActivityTrends()
+    ]);
 
     return {
       timestamp: now.toISOString(),
@@ -218,8 +236,16 @@ class RealTimeAnalyticsService {
     return alerts;
   }
 
+  // Clear cache to force fresh data on next update
+  invalidateCache() {
+    this.cache.data = null;
+    this.cache.lastUpdated = null;
+    console.log('📊 Analytics cache invalidated');
+  }
+
   // Manual trigger for immediate updates
   async triggerUpdate() {
+    this.invalidateCache();
     await this.broadcastAnalytics();
   }
 
