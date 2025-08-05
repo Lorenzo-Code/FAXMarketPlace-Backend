@@ -8,11 +8,11 @@ class RealTimeAnalyticsService {
   constructor() {
     this.isRunning = false;
     this.interval = null;
-    this.updateFrequency = 60000; // 1 minute
+    this.updateFrequency = 300000; // 5 minutes
     this.cache = {
       data: null,
       lastUpdated: null,
-      ttl: 50000 // 50 seconds cache TTL
+      ttl: 240000 // 4 minutes cache TTL
     };
   }
 
