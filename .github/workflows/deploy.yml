@@ -34,14 +34,37 @@ jobs:
               git clone https://github.com/Lorenzo-Code/FractionaX-Backend.git /root/FractionaX-Backend
               cd /root/FractionaX-Backend
             fi
-            git pull origin main
+            # Fetch and hard reset to ensure latest code
+            git fetch origin main
+            echo "📝 Current commit: $(git rev-parse HEAD)"
+            echo "📝 Remote commit: $(git rev-parse origin/main)"
+            git reset --hard origin/main
+            echo "✅ Updated to commit: $(git rev-parse HEAD)"
+            
             # Stop and remove any existing containers using port 8000
+            echo "🛑 Stopping existing containers..."
             docker ps -q --filter "publish=8000" | xargs -r docker stop
             docker ps -aq --filter "publish=8000" | xargs -r docker rm
+            
             # Also try to remove containers by name (in case they exist but not running)
             docker rm -f fax-api || true
+            
             # Clean up old images to free space
+            echo "🧹 Cleaning up old Docker images..."
             docker image prune -f
-            # Build and run new container
-            docker build -t fax-backend .
+            docker container prune -f
+            
+            # Build new image with no cache to ensure fresh build
+            echo "🔨 Building fresh Docker image..."
+            docker build --no-cache -t fax-backend .
+            
+            # Run new container
+            echo "🚀 Starting new container..."
             docker run -d --env-file .env -p 8000:8000 --name fax-api fax-backend
+            
+            # Wait for container to start and check status
+            sleep 10
+            echo "📊 Container status:"
+            docker ps | grep fax-api || echo "⚠️ Container not found in ps output"
+            echo "📋 Container logs (last 10 lines):"
+            docker logs --tail 10 fax-api || echo "⚠️ Could not fetch container logs"
