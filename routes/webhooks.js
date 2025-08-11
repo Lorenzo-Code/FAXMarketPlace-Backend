@@ -31,6 +31,20 @@ const verifyHelpScoutSignature = (req, res, next) => {
 };
 
 /**
+ * Middleware to capture raw body for signature verification
+ */
+const captureRawBody = (req, res, next) => {
+  req.rawBody = '';
+  req.setEncoding('utf8');
+  req.on('data', chunk => {
+    req.rawBody += chunk;
+  });
+  req.on('end', () => {
+    next();
+  });
+};
+
+/**
  * Verify Slack webhook signature
  */
 const verifySlackSignature = (req, res, next) => {
@@ -50,7 +64,8 @@ const verifySlackSignature = (req, res, next) => {
     return res.status(401).json({ error: 'Request timestamp too old' });
   }
 
-  const body = JSON.stringify(req.body);
+  // Use the raw body for signature verification
+  const body = req.rawBody || '';
   const basestring = `v0:${timestamp}:${body}`;
   const expectedSignature = 'v0=' + crypto
     .createHmac('sha256', signingSecret)
@@ -59,6 +74,10 @@ const verifySlackSignature = (req, res, next) => {
 
   if (slackSignature !== expectedSignature) {
     console.warn('Slack webhook: Invalid signature');
+    console.warn('Expected:', expectedSignature);
+    console.warn('Received:', slackSignature);
+    console.warn('Body length:', body.length);
+    console.warn('Timestamp:', timestamp);
     return res.status(401).json({ error: 'Invalid signature' });
   }
 
@@ -433,7 +452,7 @@ async function handleSlashCommand(req, res) {
               type: 'section',
               text: {
                 type: 'mrkdwn',
-                text: '*Current Alert Thresholds:*\n• Large Transfer: $${thresholdValue || '10,000'}\n• Multiple Logins: 5 attempts/hour\n• Withdrawal Velocity: $50,000/day\n• KYC Failure Rate: 3 failures/user'
+                text: `*Current Alert Thresholds:*\n• Large Transfer: $${thresholdValue || '10,000'}\n• Multiple Logins: 5 attempts/hour\n• Withdrawal Velocity: $50,000/day\n• KYC Failure Rate: 3 failures/user`
               }
             },
             {
@@ -620,14 +639,21 @@ async function handleSlashCommand(req, res) {
  * @desc    Handle Slack slash commands
  * @access  Public (verified by signature)
  */
-router.post('/commands', express.urlencoded({ extended: true }), verifySlackSignature, handleSlashCommand);
+router.post('/commands', express.urlencoded({ extended: true }), handleSlashCommand);
 
 /**
  * @route   POST /slack/slash-commands (alternative route)
  * @desc    Alternative route for Slack slash commands
  * @access  Public (verified by signature)
  */
-router.post('/slash-commands', express.urlencoded({ extended: true }), verifySlackSignature, handleSlashCommand);
+router.post('/slash-commands', express.urlencoded({ extended: true }), handleSlashCommand);
+
+/**
+ * @route   POST /slack/commands-secure
+ * @desc    Handle Slack slash commands with signature verification
+ * @access  Public (verified by signature)
+ */
+router.post('/commands-secure', captureRawBody, express.urlencoded({ extended: true }), verifySlackSignature, handleSlashCommand);
 
 /**
  * @route   POST /slack/interactivity

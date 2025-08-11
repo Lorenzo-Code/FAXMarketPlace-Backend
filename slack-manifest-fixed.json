@@ -1,0 +1,229 @@
+{
+    "display_information": {
+        "name": "FractionaX Ops Bot",
+        "description": "Internal operations bot for FractionaX",
+        "background_color": "#0e1b29",
+        "long_description": "The FractionaX Ops Bot connects our backend to Slack, providing real-time visibility and control over support tickets, compliance reviews, operational tasks, and system alerts.\r\nAssign, update, and resolve issues directly from Slack while keeping the FractionaX admin panel in sync.\r\nDesigned for internal use to streamline workflows and centralize team communication."
+    },
+    "features": {
+        "bot_user": {
+            "display_name": "FractionaX Ops Bot",
+            "always_online": true
+        },
+        "slash_commands": [
+            {
+                "command": "/admin-help",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Show all available admin commands",
+                "should_escape": false
+            },
+            {
+                "command": "/system-status",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Check system health, API status, and integrations",
+                "usage_hint": "[optional: detailed|quick]",
+                "should_escape": false
+            },
+            {
+                "command": "/api-health",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Test all API endpoints and service connections",
+                "usage_hint": "[optional: service-name]",
+                "should_escape": false
+            },
+            {
+                "command": "/user-info",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Get comprehensive user information and status",
+                "usage_hint": "[email]",
+                "should_escape": false
+            },
+            {
+                "command": "/user-search",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Description: Find users by email, name, or criteria",
+                "usage_hint": "[search-term]",
+                "should_escape": false
+            },
+            {
+                "command": "/user-suspend",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Suspend user account with reason",
+                "usage_hint": "[email] [reason]",
+                "should_escape": false
+            },
+            {
+                "command": "/user-unlock",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Unlock suspended or locked user account",
+                "usage_hint": "[email]",
+                "should_escape": false
+            },
+            {
+                "command": "/user-sessions",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "View and manage active user sessions",
+                "usage_hint": "[email] [optional: kill-all]",
+                "should_escape": false
+            },
+            {
+                "command": "/user-audit",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "View user activity and admin action history",
+                "usage_hint": "[email] [optional: limit]",
+                "should_escape": false
+            },
+            {
+                "command": "/user-metrics",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "User growth, activity, and engagement stats",
+                "usage_hint": "[timeframe: today|week|month]",
+                "should_escape": false
+            },
+            {
+                "command": "/debug-user",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Full technical diagnostic on user account",
+                "usage_hint": "[email]",
+                "should_escape": false
+            },
+            {
+                "command": "/reset-password",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Generate temporary password (24hr expiry)",
+                "usage_hint": "[email]",
+                "should_escape": false
+            },
+            {
+                "command": "/toggle-2fa",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Enable or disable user 2FA",
+                "usage_hint": "[email] [enable|disable]",
+                "should_escape": false
+            },
+            {
+                "command": "/security-alert",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Send security notification to admin channel",
+                "usage_hint": "[email] [alert-type] [details]",
+                "should_escape": false
+            },
+            {
+                "command": "/ip-block",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Block suspicious IP addresses",
+                "usage_hint": "[ip-address] [reason]",
+                "should_escape": false
+            },
+            {
+                "command": "/wallet-info",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Check user wallet balances and status",
+                "usage_hint": "[email]",
+                "should_escape": false
+            },
+            {
+                "command": "/wallet-manage",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Add, suspend, remove, or reactivate wallets",
+                "usage_hint": "[email] [add|suspend|remove|reactivate] [address] [reason]",
+                "should_escape": false
+            },
+            {
+                "command": "/wallet-freeze",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Emergency wallet freeze with reason",
+                "usage_hint": "[email] [wallet-address] [reason]",
+                "should_escape": false
+            },
+            {
+                "command": "/token-metrics",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "FCT/FXST circulation, supply, and transaction stats",
+                "usage_hint": "[token-type: FCT|FXST|all]",
+                "should_escape": false
+            },
+            {
+                "command": "/kyc-status",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Check and update KYC verification status",
+                "usage_hint": "[email] [optional: approve|reject|pending] [notes]",
+                "should_escape": false
+            },
+            {
+                "command": "/user-documents",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "View KYC docs, contracts, and verification status",
+                "usage_hint": "[email]",
+                "should_escape": false
+            },
+            {
+                "command": "/compliance-check",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Run full compliance audit on user",
+                "usage_hint": "[email]",
+                "should_escape": false
+            },
+            {
+                "command": "/create-ticket",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Create new support ticket",
+                "usage_hint": "[email] [subject] - [description]",
+                "should_escape": false
+            },
+            {
+                "command": "/support-stats",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "View ticket statistics and metrics",
+                "usage_hint": "[optional: timeframe]",
+                "should_escape": false
+            },
+            {
+                "command": "/ticket-manage",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "View, update, or assign support ticket",
+                "usage_hint": "[ticket-number] [optional: status|assign] [value]",
+                "should_escape": false
+            }
+        ],
+        "unfurl_domains": [
+            "fractionax.io"
+        ]
+    },
+    "oauth_config": {
+        "scopes": {
+            "bot": [
+                "chat:write",
+                "chat:write.public",
+                "reactions:read",
+                "channels:read",
+                "groups:read",
+                "channels:history",
+                "groups:history",
+                "commands",
+                "users:read",
+                "users:read.email",
+                "app_mentions:read",
+                "links:read"
+            ]
+        }
+    },
+    "settings": {
+        "event_subscriptions": {
+            "request_url": "https://api.fractionax.io/slack/interactivity",
+            "bot_events": [
+                "app_mention",
+                "link_shared",
+                "message.channels",
+                "message.groups"
+            ]
+        },
+        "interactivity": {
+            "is_enabled": true,
+            "request_url": "https://api.fractionax.io/slack/interactivity"
+        },
+        "org_deploy_enabled": false,
+        "socket_mode_enabled": false,
+        "token_rotation_enabled": false
+    }
+}
