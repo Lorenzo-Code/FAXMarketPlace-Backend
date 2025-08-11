@@ -139,9 +139,15 @@ router.post('/helpscout', express.raw({ type: 'application/json' }), verifyHelpS
  * Main handler for all slash commands
  */
 async function handleSlashCommand(req, res) {
+  const startTime = Date.now();
   const { command, text, user_id, user_name, channel_id, response_url } = req.body;
   
-  console.log('⚡ Slack slash command received:', command, text);
+  console.log('⚡ Slack slash command received:', command, text, `[${new Date().toISOString()}]`);
+  
+  // Add timeout handler
+  const responseTimer = setTimeout(() => {
+    console.warn(`⚠️ Command ${command} taking too long (>2s), may timeout`);
+  }, 2000);
   
   try {
     switch (command) {
@@ -149,6 +155,12 @@ async function handleSlashCommand(req, res) {
         return res.json({
           response_type: 'ephemeral',
           text: '✅ FractionaX Admin Bot is working! 🚀\n\nUse `/admin-help` to see all available commands.'
+        });
+        
+      case '/ping':
+        return res.json({
+          response_type: 'ephemeral',
+          text: 'pong'
         });
         
       case '/health':
@@ -1142,6 +1154,10 @@ async function handleSlashCommand(req, res) {
   } catch (error) {
     console.error('Slack slash command error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    clearTimeout(responseTimer);
+    const duration = Date.now() - startTime;
+    console.log(`✅ Command ${command} completed in ${duration}ms`);
   }
 }
 
