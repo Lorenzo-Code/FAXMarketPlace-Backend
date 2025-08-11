@@ -1,70 +1,205 @@
-## Tests
+# FractionaX Backend 🏠💰
 
-Your project includes several tests organized as follows:
+A comprehensive real estate investment platform backend with advanced admin capabilities via Slack integration.
 
-- **CoreLogic Tests**: Located in `tests/corelogic/`, these test the CoreLogic utilities and integration.
-- **AI Tests**: Located in `tests/ai/`, these include tests for AI search functionalities.
-- **Examples**: Found in `tests/examples/`, showcasing implementations and demos.
+## 🚀 Features
 
-To run your tests, navigate to the appropriate directory and execute the test files using Node.js or PowerShell depending on the file type.
+### **Core Platform**
+- **Real Estate Investment Management** - Property tokenization and fractional ownership
+- **User Management** - KYC verification, account management, role-based access
+- **Financial Operations** - Wallet management, transactions, withdrawals
+- **Analytics Dashboard** - Revenue tracking, user metrics, property performance
 
-## Getting Started
+### **🛡️ FractionaX Super Admin Bot**
+- **100+ Admin Commands** - Complete platform management via Slack
+- **8 Command Categories** - User, System, Wallet, Security, Support, Compliance, Alerts, Analytics
+- **Enterprise Security** - Signature verification, audit trails, role-based access
+- **Real-time Operations** - Instant admin actions directly from Slack
 
-We provide a sample app using Node.js that you can deploy on App Platform. These steps will get this sample application running for you using App Platform.
+## 📁 Project Structure
 
-**Note: Following these steps may result in charges for the use of DigitalOcean services.**
+```
+FractionaX-Backend/
+├── 📂 config/           # Configuration files
+├── 📂 controllers/      # Route controllers
+├── 📂 docs/            
+│   ├── 📂 readme-files/    # All README documentation
+│   └── 📄 *.md            # Technical documentation
+├── 📂 middleware/       # Express middleware
+├── 📂 models/          # MongoDB schemas
+├── 📂 routes/          # API routes
+├── 📂 scripts/
+│   ├── 📂 admin-utils/     # Admin utility scripts
+│   └── 📂 test-scripts/    # Testing utilities
+├── 📂 services/        # Business logic services
+├── 📂 tests/           # Comprehensive test suites
+├── 📂 utils/           # Helper utilities
+└── 📄 slack-manifest.json # Slack app configuration
+```
 
-### Requirements
+## 🛠️ Quick Start
 
-* You need a DigitalOcean account. If you don't already have one, you can sign up at https://cloud.digitalocean.com/registrations/new.
+### **Prerequisites**
+- Node.js 16+
+- MongoDB
+- Redis
+- Slack workspace (for admin features)
 
-## Deploying the App
+### **Installation**
+```bash
+# Clone repository
+git clone https://github.com/Lorenzo-Code/FractionaX-Backend.git
 
-Click this button to deploy the app to the DigitalOcean App Platform. If you are not logged in, you will be prompted to log in with your DigitalOcean account.
+# Install dependencies
+npm install
 
-[![Deploy to DigitalOcean](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/digitalocean/sample-nodejs/tree/main)
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your configuration
 
-Using this button disables the ability to automatically re-deploy your app when pushing to a branch or tag in your repository as you are using this repo directly.
+# Start development server
+npm run dev
+```
 
-If you want to automatically re-deploy your app, [fork](https://docs.github.com/en/github/getting-started-with-github/fork-a-repo) the GitHub repository to your account so that you have a copy of it stored to the cloud. Click the **Fork** button in the GitHub repository and follow the on-screen instructions.
+### **Environment Variables**
+```env
+# Core
+NODE_ENV=development
+PORT=5000
+MONGO_URI=mongodb://localhost:27017/fractionax
+JWT_SECRET=your-jwt-secret
 
-After forking the repo, you should now be viewing this README in your own GitHub org (e.g. `https://github.com/<your-org>/sample-nodejs`). To deploy the new repo, visit https://cloud.digitalocean.com/apps and click **Create App**. Then, click **GitHub**, select the repository you created and select the `main` branch. App Platform will inspect the code, automatically detect the kind of component to create, and use the correct buildpack to create and deploy a container.
+# Redis
+REDIS_URL=redis://localhost:6379
 
-After clicking the **Deploy to DigitalOcean** button or completing the instructions above to fork the repo, follow these steps:
+# Slack Admin Bot
+SLACK_BOT_TOKEN=xoxb-your-bot-token
+SLACK_SIGNING_SECRET=your-signing-secret
+SLACK_SUPPORT_CHANNEL_ID=your-channel-id
 
-1. Configure the app such as specifying HTTP routes, environment variables or adding a database.
-1. Provide a name for your app and select which region you want to deploy your app to and click **Next**. The closest region to you should be selected by default. All App Platform apps are routed through a global CDN. So this will not affect your app performance, unless it needs to talk to external services.
-1. On the following screen, leave all the fields as they are and click **Next**.
-1. Confirm your **Plan** settings and how many containers you want to launch and click **Launch Basic/Pro App**.
-1. You should see a "Building..." progress indicator. You can click **View Logs** to see more details of the build.
-1. It can take a few minutes for the build to finish, but you can follow the progress in the **Deployments** tab.
-1. Once the build completes successfully, click the **Live App** link in the header and you should see your running application in a new tab, displaying the home page.
+# External APIs
+CORELOGIC_API_KEY=your-api-key
+HELPSCOUT_WEBHOOK_SECRET=your-webhook-secret
+```
 
-### Making Changes to Your App
+## 🎯 Slack Super Admin Bot
 
-If you followed the steps to fork the repo and used your own copy when deploying the app, you can push changes to your fork and see App Platform automatically re-deploy the update to your app. During these automatic deployments, your application will never pause or stop serving request because App Platform offers zero-downtime deployments.
+Transform your Slack workspace into a powerful admin control center:
 
-Here's an example code change you can make for this app:
+### **Command Categories**
+- **👤 `/user`** - User management (15+ commands)
+- **⚙️ `/system`** - System operations (12+ commands)  
+- **💰 `/wallet`** - Financial management (10+ commands)
+- **🔐 `/security`** - Security operations (12+ commands)
+- **🎫 `/support`** - Support management (8+ commands)
+- **🛡️ `/compliance`** - KYC & compliance (10+ commands)
+- **🚨 `/alerts`** - Monitoring & alerts (8+ commands)
+- **📊 `/analytics`** - Reports & analytics (15+ commands)
 
-1. Edit code within the repository
-1. Commit the change to the `main` branch. Normally it's a better practice to create a new branch for your change and then merge that branch to `main` after review, but for this demo you can commit to the `main` branch directly.
-1. Visit https://cloud.digitalocean.com/apps and navigate to your sample app.
-1. You should see a "Building..." progress indicator, just like when you first created the app.
-1. Once the build completes successfully, click the **Live App** link in the header and you should see your updated application running. You may need to force refresh the page in your browser (e.g. using **Shift+Reload**).
+### **Quick Commands**
+```bash
+/admin                              # Overview of all commands
+/user info john@example.com         # Get user details
+/system status                      # System health check
+/wallet pending                     # Pending withdrawals
+/security alerts                    # Security dashboard
+```
 
-### Learn More
+**📖 Full Documentation:** [Slack Super Admin Bot Guide](SLACK_SUPER_ADMIN_BOT.md)
 
-You can learn more about the App Platform and how to manage and update your application at https://www.digitalocean.com/docs/app-platform/.
+## 🔧 Admin Utilities
 
-## Documentation
+Located in `scripts/admin-utils/`:
 
-Explore the full documentation [here](./docs/README.md) for detailed insights into caching, CoreLogic integration, and more.
+```bash
+# Unlock user account
+node scripts/admin-utils/unlock-account.js user@example.com
 
-## Deleting the App
+# Reset user password
+node scripts/admin-utils/reset-password.js user@example.com "NewPassword123!"
+```
 
-When you no longer need this sample application running live, you can delete it by following these steps:
-1. Visit the Apps control panel at https://cloud.digitalocean.com/apps.
-2. Navigate to the sample app.
-3. In the **Settings** tab, click **Destroy**.
+## 🧪 Testing
 
-**Note: If you do not delete your app, charges for using DigitalOcean services will continue to accrue.**
+### **Test Suites**
+- **API Tests** - Comprehensive endpoint testing
+- **CoreLogic Integration** - Property data API tests
+- **AI Search** - Deal finder and suggestion tests
+- **Redis Caching** - Performance testing
+
+### **Run Tests**
+```bash
+# All tests
+npm test
+
+# Specific test suites
+npm run test:api
+npm run test:corelogic
+npm run test:ai
+```
+
+## 📚 Documentation
+
+All documentation is organized in `docs/readme-files/`:
+
+- **[Main README](docs/readme-files/MAIN-README.md)** - Original project documentation
+- **[Tests README](docs/readme-files/TESTS-README.md)** - Testing guidelines
+- **[Support Tickets README](docs/readme-files/SUPPORT-TICKETS-README.md)** - Support system docs
+- **[Docs README](docs/readme-files/DOCS-README.md)** - Documentation index
+
+## 🚀 Deployment
+
+### **Production Setup**
+```bash
+# Build for production
+npm run build
+
+# Start production server
+npm start
+```
+
+### **Docker Support**
+```bash
+# Build image
+docker build -t fractionax-backend .
+
+# Run container
+docker run -p 5000:5000 fractionax-backend
+```
+
+## 🔐 Security
+
+- **JWT Authentication** - Secure user sessions
+- **Role-Based Access Control** - Admin, user, moderator roles
+- **Rate Limiting** - API protection against abuse
+- **Input Validation** - Comprehensive data sanitization
+- **Slack Signature Verification** - Secure webhook handling
+
+## 📊 Monitoring
+
+- **Health Checks** - `/api/health` endpoint
+- **Error Logging** - Comprehensive error tracking
+- **Performance Metrics** - Redis caching analytics
+- **Admin Alerts** - Real-time Slack notifications
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 📞 Support
+
+- **Slack Admin Bot** - Use `/admin` for comprehensive help
+- **Documentation** - Check `docs/` for detailed guides
+- **Issues** - Create GitHub issues for bug reports
+
+---
+
+**🏠 Built for the future of real estate investment** | **🛡️ Powered by Slack Super Admin Bot**
