@@ -1205,6 +1205,27 @@ router.post('/interactivity', slackBodyParser, async (req, res) => {
 });
 
 /**
+ * @route   GET /version
+ * @desc    Show current code version and timestamp
+ * @access  Public
+ */
+router.get('/version', (req, res) => {
+  res.json({
+    version: 'v2.0.0-umbrella-commands',
+    timestamp: new Date().toISOString(),
+    features: [
+      'Umbrella command system',
+      '100+ admin commands',
+      'Backward compatibility with /admin-help',
+      'Enhanced user management',
+      'Real-time system monitoring'
+    ],
+    lastUpdate: 'January 11, 2025 - Enhanced deployment system',
+    commitHash: process.env.COMMIT_HASH || 'cf76896'
+  });
+});
+
+/**
  * @route   GET /test
  * @desc    Test webhook endpoint
  * @access  Public
