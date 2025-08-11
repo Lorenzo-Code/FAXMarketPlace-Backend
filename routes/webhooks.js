@@ -31,57 +31,85 @@ const verifyHelpScoutSignature = (req, res, next) => {
 };
 
 /**
- * Middleware to capture raw body for signature verification
- */
-const captureRawBody = (req, res, next) => {
-  req.rawBody = '';
-  req.setEncoding('utf8');
-  req.on('data', chunk => {
-    req.rawBody += chunk;
-  });
-  req.on('end', () => {
-    next();
-  });
-};
-
-/**
- * Verify Slack webhook signature
+ * Enhanced Slack signature verification middleware
+ * Properly handles raw body capture and parsing for secure verification
  */
 const verifySlackSignature = (req, res, next) => {
   const slackSignature = req.get('X-Slack-Signature');
   const timestamp = req.get('X-Slack-Request-Timestamp');
   const signingSecret = process.env.SLACK_SIGNING_SECRET;
 
-  if (!slackSignature || !timestamp || !signingSecret) {
-    console.warn('Slack webhook: Missing signature, timestamp, or secret');
-    return res.status(401).json({ error: 'Unauthorized' });
+  // Skip verification in development mode if secret not set
+  if (!signingSecret) {
+    console.warn('⚠️ SLACK_SIGNING_SECRET not set - skipping signature verification (DEVELOPMENT ONLY)');
+    return next();
+  }
+
+  if (!slackSignature || !timestamp) {
+    console.warn('❌ Slack webhook: Missing signature or timestamp');
+    return res.status(401).json({ error: 'Unauthorized - Missing signature headers' });
   }
 
   // Check timestamp (protect against replay attacks)
   const currentTime = Math.floor(Date.now() / 1000);
-  if (Math.abs(currentTime - timestamp) > 300) { // 5 minutes
-    console.warn('Slack webhook: Timestamp too old');
+  const timeDiff = Math.abs(currentTime - timestamp);
+  if (timeDiff > 300) { // 5 minutes
+    console.warn(`❌ Slack webhook: Request too old (${timeDiff}s ago)`);
     return res.status(401).json({ error: 'Request timestamp too old' });
   }
 
-  // Use the raw body for signature verification
-  const body = req.rawBody || '';
-  const basestring = `v0:${timestamp}:${body}`;
+  // Get raw body - Express should have captured this
+  const rawBody = req.rawBody || req.body || '';
+  let bodyString;
+  
+  if (typeof rawBody === 'string') {
+    bodyString = rawBody;
+  } else if (Buffer.isBuffer(rawBody)) {
+    bodyString = rawBody.toString('utf8');
+  } else {
+    // Reconstruct from parsed form data
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(rawBody)) {
+      params.append(key, value);
+    }
+    bodyString = params.toString();
+  }
+
+  // Create signature
+  const basestring = `v0:${timestamp}:${bodyString}`;
   const expectedSignature = 'v0=' + crypto
     .createHmac('sha256', signingSecret)
     .update(basestring)
     .digest('hex');
 
-  if (slackSignature !== expectedSignature) {
-    console.warn('Slack webhook: Invalid signature');
-    console.warn('Expected:', expectedSignature);
-    console.warn('Received:', slackSignature);
-    console.warn('Body length:', body.length);
-    console.warn('Timestamp:', timestamp);
+  // Secure comparison to prevent timing attacks
+  const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+  const receivedBuffer = Buffer.from(slackSignature, 'utf8');
+  
+  if (expectedBuffer.length !== receivedBuffer.length || 
+      !crypto.timingSafeEqual(expectedBuffer, receivedBuffer)) {
+    console.warn('❌ Slack webhook: Invalid signature');
+    console.warn(`Expected: ${expectedSignature}`);
+    console.warn(`Received: ${slackSignature}`);
+    console.warn(`Body length: ${bodyString.length}`);
+    console.warn(`Timestamp: ${timestamp}`);
     return res.status(401).json({ error: 'Invalid signature' });
   }
 
+  console.log('✅ Slack webhook signature verified successfully');
   next();
+};
+
+/**
+ * Middleware to capture raw body before parsing
+ */
+const captureRawBody = (req, res, next) => {
+  const chunks = [];
+  req.on('data', chunk => chunks.push(chunk));
+  req.on('end', () => {
+    req.rawBody = Buffer.concat(chunks).toString('utf8');
+    next();
+  });
 };
 
 /**
@@ -636,24 +664,24 @@ async function handleSlashCommand(req, res) {
 
 /**
  * @route   POST /slack/commands
- * @desc    Handle Slack slash commands
- * @access  Public (verified by signature)
- */
-router.post('/commands', express.urlencoded({ extended: true }), handleSlashCommand);
-
-/**
- * @route   POST /slack/slash-commands (alternative route)
- * @desc    Alternative route for Slack slash commands
- * @access  Public (verified by signature)
- */
-router.post('/slash-commands', express.urlencoded({ extended: true }), handleSlashCommand);
-
-/**
- * @route   POST /slack/commands-secure
  * @desc    Handle Slack slash commands with signature verification
  * @access  Public (verified by signature)
  */
-router.post('/commands-secure', captureRawBody, express.urlencoded({ extended: true }), verifySlackSignature, handleSlashCommand);
+router.post('/commands', captureRawBody, express.urlencoded({ extended: true }), verifySlackSignature, handleSlashCommand);
+
+/**
+ * @route   POST /slack/slash-commands (alternative route)
+ * @desc    Handle Slack slash commands with signature verification
+ * @access  Public (verified by signature)
+ */
+router.post('/slash-commands', captureRawBody, express.urlencoded({ extended: true }), verifySlackSignature, handleSlashCommand);
+
+/**
+ * @route   POST /slack/commands-insecure
+ * @desc    Handle Slack slash commands WITHOUT signature verification (emergency fallback)
+ * @access  Public (NO verification - use only for testing)
+ */
+router.post('/commands-insecure', express.urlencoded({ extended: true }), handleSlashCommand);
 
 /**
  * @route   POST /slack/interactivity
