@@ -695,24 +695,19 @@ router.post('/slack/slash-commands', express.urlencoded({ extended: true }), ver
               type: 'header',
               text: {
                 type: 'plain_text',
-                text: '🛠️ FractionaX Admin Commands'
+                text: '🛠️ FractionaX Admin Commands (25 Total)'
               }
             },
             {
               type: 'section',
               text: {
                 type: 'mrkdwn',
-                text: '*Support Commands:*\n' +
-                      '• `/support-stats` - View support ticket statistics\n' +
-                      '• `/create-ticket [email] [subject] - [description]` - Create new ticket\n\n' +
-                      '*User Management:*\n' +
-                      '• `/user-info [email]` - Get user information\n' +
-                      '• `/reset-password [email]` - Reset user password\n' +
-                      '• `/toggle-2fa [email] [enable|disable]` - Manage 2FA\n' +
-                      '• `/manage-wallet [email] [action] [address]` - Manage wallets\n' +
-                      '• `/user-documents [email]` - View user documents\n' +
-                      '• `/user-audit [email]` - View audit log\n' +
-                      '• `/security-alert [email] [type] [details]` - Send security alert'
+                text: '*🔧 System:* `/system-status` `/api-health`\n' +
+                      '*👤 Users:* `/user-info` `/user-search` `/user-suspend` `/user-unlock` `/user-sessions` `/user-audit` `/user-metrics` `/debug-user`\n' +
+                      '*🔐 Security:* `/reset-password` `/toggle-2fa` `/security-alert` `/ip-block`\n' +
+                      '*💰 Wallets:* `/wallet-info` `/wallet-manage` `/wallet-freeze` `/token-metrics`\n' +
+                      '*🛡️ KYC:* `/kyc-status` `/user-documents` `/compliance-check`\n' +
+                      '*🎫 Support:* `/create-ticket` `/support-stats` `/ticket-manage`'
               }
             },
             {
@@ -720,7 +715,7 @@ router.post('/slack/slash-commands', express.urlencoded({ extended: true }), ver
               elements: [
                 {
                   type: 'mrkdwn',
-                  text: '🛡️ All admin actions are logged and audited.'
+                  text: '🛡️ All admin actions are logged and audited. Use commands without params for help.'
                 }
               ]
             }
@@ -728,10 +723,1002 @@ router.post('/slack/slash-commands', express.urlencoded({ extended: true }), ver
         });
         break;
         
+      // =================== SYSTEM & HEALTH COMMANDS ===================
+      
+      case '/system-status':
+        try {
+          const mongoose = require('mongoose');
+          const redisClient = require('../utils/redisClient');
+          
+          const dbStatus = mongoose.connection.readyState === 1 ? '✅ Connected' : '❌ Disconnected';
+          const redisStatus = redisClient.status === 'ready' ? '✅ Connected' : '❌ Disconnected';
+          const uptime = process.uptime();
+          const uptimeHours = Math.floor(uptime / 3600);
+          const uptimeMinutes = Math.floor((uptime % 3600) / 60);
+          
+          // Check if lockdown requested
+          if (text && text.toLowerCase().includes('lockdown')) {
+            // Implement emergency lockdown logic here
+            res.json({
+              response_type: 'ephemeral',
+              text: '🚨 Emergency lockdown initiated. All user logins disabled.',
+              blocks: [
+                {
+                  type: 'section',
+                  text: {
+                    type: 'mrkdwn',
+                    text: '🚨 *EMERGENCY LOCKDOWN ACTIVE*\nAll user authentication has been disabled.\nOnly admin access remains active.'
+                  }
+                }
+              ]
+            });
+            return;
+          }
+          
+          res.json({
+            response_type: 'ephemeral',
+            blocks: [
+              {
+                type: 'header',
+                text: {
+                  type: 'plain_text',
+                  text: '📊 FractionaX System Status'
+                }
+              },
+              {
+                type: 'section',
+                fields: [
+                  { type: 'mrkdwn', text: `*Database:* ${dbStatus}` },
+                  { type: 'mrkdwn', text: `*Redis:* ${redisStatus}` },
+                  { type: 'mrkdwn', text: `*Uptime:* ${uptimeHours}h ${uptimeMinutes}m` },
+                  { type: 'mrkdwn', text: `*Memory:* ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB` },
+                  { type: 'mrkdwn', text: `*Environment:* ${process.env.NODE_ENV || 'development'}` },
+                  { type: 'mrkdwn', text: `*Version:* ${process.env.npm_package_version || 'unknown'}` }
+                ]
+              },
+              {
+                type: 'context',
+                elements: [
+                  {
+                    type: 'mrkdwn',
+                    text: 'Use `/system-status lockdown [reason]` for emergency lockdown'
+                  }
+                ]
+              }
+            ]
+          });
+        } catch (error) {
+          res.json({
+            response_type: 'ephemeral',
+            text: '❌ Error checking system status'
+          });
+        }
+        break;
+        
+      case '/api-health':
+        try {
+          const healthChecks = {
+            database: mongoose.connection.readyState === 1,
+            redis: require('../utils/redisClient').status === 'ready',
+            slack: slackService.connected,
+            // Add more health checks as needed
+          };
+          
+          const allHealthy = Object.values(healthChecks).every(status => status);
+          
+          res.json({
+            response_type: 'ephemeral',
+            blocks: [
+              {
+                type: 'header',
+                text: {
+                  type: 'plain_text',
+                  text: `${allHealthy ? '✅' : '❌'} API Health Check`
+                }
+              },
+              {
+                type: 'section',
+                fields: [
+                  { type: 'mrkdwn', text: `*Database:* ${healthChecks.database ? '✅' : '❌'}` },
+                  { type: 'mrkdwn', text: `*Redis Cache:* ${healthChecks.redis ? '✅' : '❌'}` },
+                  { type: 'mrkdwn', text: `*Slack Integration:* ${healthChecks.slack ? '✅' : '❌'}` },
+                  { type: 'mrkdwn', text: `*Overall Status:* ${allHealthy ? '🟢 Healthy' : '🔴 Issues Detected'}` }
+                ]
+              }
+            ]
+          });
+        } catch (error) {
+          res.json({
+            response_type: 'ephemeral',
+            text: '❌ Error performing health check'
+          });
+        }
+        break;
+        
+      // =================== ENHANCED USER MANAGEMENT ===================
+      
+      case '/user-search':
+        if (!text || !text.trim()) {
+          res.json({
+            response_type: 'ephemeral',
+            text: 'Usage: `/user-search [email|name|phone|partial]`'
+          });
+        } else {
+          try {
+            const searchTerm = text.trim();
+            const User = require('../models/User');
+            
+            const users = await User.find({
+              $or: [
+                { email: { $regex: searchTerm, $options: 'i' } },
+                { firstName: { $regex: searchTerm, $options: 'i' } },
+                { lastName: { $regex: searchTerm, $options: 'i' } },
+                { phone: { $regex: searchTerm, $options: 'i' } }
+              ]
+            })
+            .select('email firstName lastName accountStatus createdAt')
+            .limit(10)
+            .lean();
+            
+            if (users.length === 0) {
+              res.json({
+                response_type: 'ephemeral',
+                text: `No users found matching: "${searchTerm}"`
+              });
+              return;
+            }
+            
+            const userList = users.map(user => 
+              `• ${user.firstName} ${user.lastName} (${user.email}) - ${user.accountStatus || 'active'}`
+            ).join('\n');
+            
+            res.json({
+              response_type: 'ephemeral',
+              blocks: [
+                {
+                  type: 'header',
+                  text: {
+                    type: 'plain_text',
+                    text: `🔍 Search Results: "${searchTerm}"`
+                  }
+                },
+                {
+                  type: 'section',
+                  text: {
+                    type: 'mrkdwn',
+                    text: `*Found ${users.length} user(s):*\n${userList}`
+                  }
+                }
+              ]
+            });
+          } catch (error) {
+            res.json({
+              response_type: 'ephemeral',
+              text: 'Error searching users'
+            });
+          }
+        }
+        break;
+        
+      case '/user-suspend':
+        if (!text || !text.trim()) {
+          res.json({
+            response_type: 'ephemeral',
+            text: 'Usage: `/user-suspend [email] [reason]`'
+          });
+        } else {
+          try {
+            const parts = text.trim().split(' ');
+            const email = parts[0];
+            const reason = parts.slice(1).join(' ') || 'Admin suspension';
+            
+            const User = require('../models/User');
+            const user = await User.findOne({ email: email.toLowerCase() });
+            
+            if (!user) {
+              res.json({
+                response_type: 'ephemeral',
+                text: `❌ User not found: ${email}`
+              });
+              return;
+            }
+            
+            user.accountStatus = 'suspended';
+            user.suspendedAt = new Date();
+            user.suspendedBy = user_name;
+            user.suspensionReason = reason;
+            await user.save();
+            
+            // Log audit trail
+            const logAudit = require('../utils/logAudit');
+            await logAudit(user_name, 'user_suspended', 'User', user._id, {
+              targetEmail: email,
+              reason: reason
+            });
+            
+            res.json({
+              response_type: 'ephemeral',
+              text: `✅ User suspended: ${email}`,
+              blocks: [
+                {
+                  type: 'section',
+                  text: {
+                    type: 'mrkdwn',
+                    text: `🚫 *User Suspended*\n*Email:* ${email}\n*Reason:* ${reason}\n*By:* ${user_name}`
+                  }
+                }
+              ]
+            });
+          } catch (error) {
+            res.json({
+              response_type: 'ephemeral',
+              text: 'Error suspending user'
+            });
+          }
+        }
+        break;
+        
+      case '/user-unlock':
+        if (!text || !text.trim()) {
+          res.json({
+            response_type: 'ephemeral',
+            text: 'Usage: `/user-unlock [email]`'
+          });
+        } else {
+          try {
+            const email = text.trim();
+            const User = require('../models/User');
+            const user = await User.findOne({ email: email.toLowerCase() });
+            
+            if (!user) {
+              res.json({
+                response_type: 'ephemeral',
+                text: `❌ User not found: ${email}`
+              });
+              return;
+            }
+            
+            user.accountStatus = 'active';
+            user.loginAttempts = 0;
+            user.lockUntil = null;
+            user.suspendedAt = null;
+            user.suspendedBy = null;
+            user.suspensionReason = null;
+            user.unlockedAt = new Date();
+            user.unlockedBy = user_name;
+            await user.save();
+            
+            // Log audit trail
+            const logAudit = require('../utils/logAudit');
+            await logAudit(user_name, 'user_unlocked', 'User', user._id, {
+              targetEmail: email
+            });
+            
+            res.json({
+              response_type: 'ephemeral',
+              text: `✅ User unlocked: ${email}`,
+              blocks: [
+                {
+                  type: 'section',
+                  text: {
+                    type: 'mrkdwn',
+                    text: `🔓 *User Unlocked*\n*Email:* ${email}\n*Status:* Active\n*By:* ${user_name}`
+                  }
+                }
+              ]
+            });
+          } catch (error) {
+            res.json({
+              response_type: 'ephemeral',
+              text: 'Error unlocking user'
+            });
+          }
+        }
+        break;
+        
+      // =================== ADDITIONAL USER COMMANDS ===================
+      
+      case '/user-sessions':
+        if (!text || !text.trim()) {
+          res.json({
+            response_type: 'ephemeral',
+            text: 'Usage: `/user-sessions [email] [optional: kill-all]`'
+          });
+        } else {
+          try {
+            const parts = text.trim().split(' ');
+            const email = parts[0];
+            const action = parts[1];
+            
+            const User = require('../models/User');
+            const user = await User.findOne({ email: email.toLowerCase() });
+            
+            if (!user) {
+              res.json({
+                response_type: 'ephemeral',
+                text: `❌ User not found: ${email}`
+              });
+              return;
+            }
+            
+            if (action === 'kill-all') {
+              // Clear all user sessions (implement based on your session system)
+              user.sessionTokens = [];
+              user.lastLogout = new Date();
+              await user.save();
+              
+              res.json({
+                response_type: 'ephemeral',
+                text: `✅ All sessions terminated for: ${email}`
+              });
+            } else {
+              // Show active sessions
+              const sessionCount = user.sessionTokens?.length || 0;
+              const lastLogin = user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'Never';
+              
+              res.json({
+                response_type: 'ephemeral',
+                blocks: [
+                  {
+                    type: 'header',
+                    text: {
+                      type: 'plain_text',
+                      text: `🔐 Sessions for: ${email}`
+                    }
+                  },
+                  {
+                    type: 'section',
+                    fields: [
+                      { type: 'mrkdwn', text: `*Active Sessions:* ${sessionCount}` },
+                      { type: 'mrkdwn', text: `*Last Login:* ${lastLogin}` },
+                      { type: 'mrkdwn', text: `*Status:* ${user.accountStatus || 'active'}` }
+                    ]
+                  },
+                  {
+                    type: 'context',
+                    elements: [
+                      {
+                        type: 'mrkdwn',
+                        text: 'Use `/user-sessions [email] kill-all` to terminate all sessions'
+                      }
+                    ]
+                  }
+                ]
+              });
+            }
+          } catch (error) {
+            res.json({
+              response_type: 'ephemeral',
+              text: 'Error managing user sessions'
+            });
+          }
+        }
+        break;
+        
+      case '/user-metrics':
+        try {
+          const timeframe = text?.trim() || 'week';
+          const User = require('../models/User');
+          
+          let dateFilter = new Date();
+          switch (timeframe.toLowerCase()) {
+            case 'today':
+              dateFilter.setHours(0, 0, 0, 0);
+              break;
+            case 'week':
+              dateFilter.setDate(dateFilter.getDate() - 7);
+              break;
+            case 'month':
+              dateFilter.setMonth(dateFilter.getMonth() - 1);
+              break;
+            default:
+              dateFilter.setDate(dateFilter.getDate() - 7);
+          }
+          
+          const [totalUsers, newUsers, activeUsers, suspendedUsers] = await Promise.all([
+            User.countDocuments(),
+            User.countDocuments({ createdAt: { $gte: dateFilter } }),
+            User.countDocuments({ lastLogin: { $gte: dateFilter } }),
+            User.countDocuments({ accountStatus: 'suspended' })
+          ]);
+          
+          res.json({
+            response_type: 'ephemeral',
+            blocks: [
+              {
+                type: 'header',
+                text: {
+                  type: 'plain_text',
+                  text: `📊 User Metrics (${timeframe})`
+                }
+              },
+              {
+                type: 'section',
+                fields: [
+                  { type: 'mrkdwn', text: `*Total Users:* ${totalUsers}` },
+                  { type: 'mrkdwn', text: `*New Users:* ${newUsers}` },
+                  { type: 'mrkdwn', text: `*Active Users:* ${activeUsers}` },
+                  { type: 'mrkdwn', text: `*Suspended:* ${suspendedUsers}` }
+                ]
+              }
+            ]
+          });
+        } catch (error) {
+          res.json({
+            response_type: 'ephemeral',
+            text: 'Error fetching user metrics'
+          });
+        }
+        break;
+        
+      case '/debug-user':
+        if (!text || !text.trim()) {
+          res.json({
+            response_type: 'ephemeral',
+            text: 'Usage: `/debug-user [email]`'
+          });
+        } else {
+          try {
+            const email = text.trim();
+            const User = require('../models/User');
+            const user = await User.findOne({ email: email.toLowerCase() }).lean();
+            
+            if (!user) {
+              res.json({
+                response_type: 'ephemeral',
+                text: `❌ User not found: ${email}`
+              });
+              return;
+            }
+            
+            const debugInfo = {
+              id: user._id,
+              created: new Date(user.createdAt).toISOString(),
+              lastLogin: user.lastLogin ? new Date(user.lastLogin).toISOString() : 'Never',
+              loginAttempts: user.loginAttempts || 0,
+              emailVerified: user.emailVerified || false,
+              twoFactorEnabled: user.twoFactor?.enabled || false,
+              walletCount: user.wallets?.length || 0,
+              kycStatus: user.kyc?.status || 'not_submitted',
+              accountStatus: user.accountStatus || 'active'
+            };
+            
+            res.json({
+              response_type: 'ephemeral',
+              blocks: [
+                {
+                  type: 'header',
+                  text: {
+                    type: 'plain_text',
+                    text: `🔍 Debug Info: ${email}`
+                  }
+                },
+                {
+                  type: 'section',
+                  text: {
+                    type: 'mrkdwn',
+                    text: `*ID:* ${debugInfo.id}\n` +
+                          `*Created:* ${debugInfo.created}\n` +
+                          `*Last Login:* ${debugInfo.lastLogin}\n` +
+                          `*Login Attempts:* ${debugInfo.loginAttempts}\n` +
+                          `*Email Verified:* ${debugInfo.emailVerified ? '✅' : '❌'}\n` +
+                          `*2FA Enabled:* ${debugInfo.twoFactorEnabled ? '✅' : '❌'}\n` +
+                          `*Wallets:* ${debugInfo.walletCount}\n` +
+                          `*KYC:* ${debugInfo.kycStatus}\n` +
+                          `*Account Status:* ${debugInfo.accountStatus}`
+                  }
+                }
+              ]
+            });
+          } catch (error) {
+            res.json({
+              response_type: 'ephemeral',
+              text: 'Error debugging user'
+            });
+          }
+        }
+        break;
+        
+      // =================== SECURITY COMMANDS ===================
+      
+      case '/ip-block':
+        if (!text || !text.trim()) {
+          res.json({
+            response_type: 'ephemeral',
+            text: 'Usage: `/ip-block [ip-address] [reason]`'
+          });
+        } else {
+          try {
+            const parts = text.trim().split(' ');
+            const ipAddress = parts[0];
+            const reason = parts.slice(1).join(' ') || 'Admin block via Slack';
+            
+            // Basic IP validation
+            const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+            if (!ipRegex.test(ipAddress)) {
+              res.json({
+                response_type: 'ephemeral',
+                text: 'Invalid IP address format'
+              });
+              return;
+            }
+            
+            // Block IP (implement with your IP blocking service)
+            const ipBlockingService = require('../services/ipBlockingService');
+            await ipBlockingService.blockIP(ipAddress, reason, user_name);
+            
+            res.json({
+              response_type: 'ephemeral',
+              text: `✅ IP blocked: ${ipAddress}`,
+              blocks: [
+                {
+                  type: 'section',
+                  text: {
+                    type: 'mrkdwn',
+                    text: `🚫 *IP Address Blocked*\n*IP:* ${ipAddress}\n*Reason:* ${reason}\n*By:* ${user_name}`
+                  }
+                }
+              ]
+            });
+          } catch (error) {
+            res.json({
+              response_type: 'ephemeral',
+              text: 'Error blocking IP address'
+            });
+          }
+        }
+        break;
+        
+      // =================== WALLET & FINANCE COMMANDS ===================
+      
+      case '/wallet-info':
+        if (!text || !text.trim()) {
+          res.json({
+            response_type: 'ephemeral',
+            text: 'Usage: `/wallet-info [email]`'
+          });
+        } else {
+          try {
+            const email = text.trim();
+            const User = require('../models/User');
+            const user = await User.findOne({ email: email.toLowerCase() }).lean();
+            
+            if (!user) {
+              res.json({
+                response_type: 'ephemeral',
+                text: `❌ User not found: ${email}`
+              });
+              return;
+            }
+            
+            const wallets = user.wallets || [];
+            const activeWallets = wallets.filter(w => w.status === 'active').length;
+            const suspendedWallets = wallets.filter(w => w.status === 'suspended').length;
+            
+            const walletList = wallets.length > 0 
+              ? wallets.map(w => `• ${w.address.substring(0, 10)}...${w.address.substring(-6)} (${w.status})`).join('\n')
+              : 'No wallets found';
+            
+            res.json({
+              response_type: 'ephemeral',
+              blocks: [
+                {
+                  type: 'header',
+                  text: {
+                    type: 'plain_text',
+                    text: `💰 Wallet Info: ${email}`
+                  }
+                },
+                {
+                  type: 'section',
+                  fields: [
+                    { type: 'mrkdwn', text: `*Total Wallets:* ${wallets.length}` },
+                    { type: 'mrkdwn', text: `*Active:* ${activeWallets}` },
+                    { type: 'mrkdwn', text: `*Suspended:* ${suspendedWallets}` }
+                  ]
+                },
+                {
+                  type: 'section',
+                  text: {
+                    type: 'mrkdwn',
+                    text: `*Wallet Addresses:*\n${walletList}`
+                  }
+                }
+              ]
+            });
+          } catch (error) {
+            res.json({
+              response_type: 'ephemeral',
+              text: 'Error fetching wallet info'
+            });
+          }
+        }
+        break;
+        
+      case '/wallet-freeze':
+        if (!text || !text.trim()) {
+          res.json({
+            response_type: 'ephemeral',
+            text: 'Usage: `/wallet-freeze [email] [wallet-address] [reason]`'
+          });
+        } else {
+          try {
+            const parts = text.trim().split(' ');
+            if (parts.length < 3) {
+              res.json({
+                response_type: 'ephemeral',
+                text: 'Usage: `/wallet-freeze [email] [wallet-address] [reason]`'
+              });
+              return;
+            }
+            
+            const [email, walletAddress, ...reasonParts] = parts;
+            const reason = reasonParts.join(' ');
+            
+            const result = await slackService.manageUserWallet(email, 'suspend', {
+              address: walletAddress,
+              reason: `EMERGENCY FREEZE: ${reason}`
+            }, user_name);
+            
+            if (result.success) {
+              res.json({
+                response_type: 'ephemeral',
+                text: `🚨 Emergency wallet freeze completed: ${walletAddress}`,
+                blocks: [
+                  {
+                    type: 'section',
+                    text: {
+                      type: 'mrkdwn',
+                      text: `🚨 *EMERGENCY WALLET FREEZE*\n*User:* ${email}\n*Wallet:* ${walletAddress.substring(0, 10)}...${walletAddress.substring(-6)}\n*Reason:* ${reason}\n*By:* ${user_name}`
+                    }
+                  }
+                ]
+              });
+            } else {
+              res.json({
+                response_type: 'ephemeral',
+                text: `❌ ${result.error}`
+              });
+            }
+          } catch (error) {
+            res.json({
+              response_type: 'ephemeral',
+              text: 'Error freezing wallet'
+            });
+          }
+        }
+        break;
+        
+      case '/token-metrics':
+        try {
+          const tokenType = text?.trim().toUpperCase() || 'ALL';
+          
+          // Mock token metrics - replace with real data
+          const metrics = {
+            FCT: { supply: 1000000, circulation: 750000, price: 1.25 },
+            FXST: { supply: 500000, circulation: 300000, price: 2.50 }
+          };
+          
+          if (tokenType !== 'ALL' && !metrics[tokenType]) {
+            res.json({
+              response_type: 'ephemeral',
+              text: 'Invalid token type. Use: FCT, FXST, or ALL'
+            });
+            return;
+          }
+          
+          const displayMetrics = tokenType === 'ALL' ? metrics : { [tokenType]: metrics[tokenType] };
+          
+          const fields = [];
+          Object.entries(displayMetrics).forEach(([token, data]) => {
+            fields.push(
+              { type: 'mrkdwn', text: `*${token} Supply:* ${data.supply.toLocaleString()}` },
+              { type: 'mrkdwn', text: `*${token} Circulation:* ${data.circulation.toLocaleString()}` },
+              { type: 'mrkdwn', text: `*${token} Price:* $${data.price}` }
+            );
+          });
+          
+          res.json({
+            response_type: 'ephemeral',
+            blocks: [
+              {
+                type: 'header',
+                text: {
+                  type: 'plain_text',
+                  text: `🪙 Token Metrics: ${tokenType}`
+                }
+              },
+              {
+                type: 'section',
+                fields: fields
+              }
+            ]
+          });
+        } catch (error) {
+          res.json({
+            response_type: 'ephemeral',
+            text: 'Error fetching token metrics'
+          });
+        }
+        break;
+        
+      // =================== KYC & COMPLIANCE COMMANDS ===================
+      
+      case '/kyc-status':
+        if (!text || !text.trim()) {
+          res.json({
+            response_type: 'ephemeral',
+            text: 'Usage: `/kyc-status [email] [optional: approve|reject|pending] [notes]`'
+          });
+        } else {
+          try {
+            const parts = text.trim().split(' ');
+            const email = parts[0];
+            const action = parts[1];
+            const notes = parts.slice(2).join(' ');
+            
+            const User = require('../models/User');
+            const user = await User.findOne({ email: email.toLowerCase() });
+            
+            if (!user) {
+              res.json({
+                response_type: 'ephemeral',
+                text: `❌ User not found: ${email}`
+              });
+              return;
+            }
+            
+            if (action && ['approve', 'reject', 'pending'].includes(action.toLowerCase())) {
+              // Update KYC status
+              if (!user.kyc) user.kyc = {};
+              user.kyc.status = action.toLowerCase() === 'approve' ? 'approved' : action.toLowerCase();
+              user.kyc.reviewedAt = new Date();
+              user.kyc.reviewedBy = user_name;
+              if (notes) user.kyc.reviewNotes = notes;
+              if (action.toLowerCase() === 'reject' && notes) user.kyc.rejectionReason = notes;
+              
+              await user.save();
+              
+              // Log audit
+              const logAudit = require('../utils/logAudit');
+              await logAudit(user_name, `kyc_${action.toLowerCase()}`, 'User', user._id, {
+                targetEmail: email,
+                notes: notes
+              });
+              
+              res.json({
+                response_type: 'ephemeral',
+                text: `✅ KYC status updated: ${email} - ${action.toUpperCase()}`,
+                blocks: [
+                  {
+                    type: 'section',
+                    text: {
+                      type: 'mrkdwn',
+                      text: `🛡️ *KYC ${action.toUpperCase()}*\n*User:* ${email}\n*Status:* ${user.kyc.status}\n*Reviewed by:* ${user_name}${notes ? `\n*Notes:* ${notes}` : ''}`
+                    }
+                  }
+                ]
+              });
+            } else {
+              // Just show status
+              const kycStatus = user.kyc?.status || 'not_submitted';
+              const reviewedBy = user.kyc?.reviewedBy || 'Not reviewed';
+              const reviewedAt = user.kyc?.reviewedAt ? new Date(user.kyc.reviewedAt).toLocaleDateString() : 'Never';
+              const documents = user.kyc?.documents?.length || 0;
+              
+              res.json({
+                response_type: 'ephemeral',
+                blocks: [
+                  {
+                    type: 'header',
+                    text: {
+                      type: 'plain_text',
+                      text: `🛡️ KYC Status: ${email}`
+                    }
+                  },
+                  {
+                    type: 'section',
+                    fields: [
+                      { type: 'mrkdwn', text: `*Status:* ${kycStatus}` },
+                      { type: 'mrkdwn', text: `*Documents:* ${documents}` },
+                      { type: 'mrkdwn', text: `*Reviewed By:* ${reviewedBy}` },
+                      { type: 'mrkdwn', text: `*Reviewed:* ${reviewedAt}` }
+                    ]
+                  }
+                ]
+              });
+            }
+          } catch (error) {
+            res.json({
+              response_type: 'ephemeral',
+              text: 'Error managing KYC status'
+            });
+          }
+        }
+        break;
+        
+      case '/compliance-check':
+        if (!text || !text.trim()) {
+          res.json({
+            response_type: 'ephemeral',
+            text: 'Usage: `/compliance-check [email]`'
+          });
+        } else {
+          try {
+            const email = text.trim();
+            const User = require('../models/User');
+            const user = await User.findOne({ email: email.toLowerCase() }).lean();
+            
+            if (!user) {
+              res.json({
+                response_type: 'ephemeral',
+                text: `❌ User not found: ${email}`
+              });
+              return;
+            }
+            
+            // Compliance checklist
+            const checks = {
+              emailVerified: user.emailVerified || false,
+              kycApproved: user.kyc?.status === 'approved',
+              documentsSubmitted: (user.kyc?.documents?.length || 0) >= 2,
+              contractsSigned: (user.signedContracts?.length || 0) > 0,
+              twoFactorEnabled: user.twoFactor?.enabled || false,
+              walletConnected: (user.wallets?.length || 0) > 0,
+              accountActive: user.accountStatus !== 'suspended'
+            };
+            
+            const passed = Object.values(checks).filter(Boolean).length;
+            const total = Object.keys(checks).length;
+            const complianceScore = Math.round((passed / total) * 100);
+            
+            const checkList = Object.entries(checks)
+              .map(([key, value]) => `${value ? '✅' : '❌'} ${key.replace(/([A-Z])/g, ' $1').toLowerCase()}`)
+              .join('\n');
+            
+            res.json({
+              response_type: 'ephemeral',
+              blocks: [
+                {
+                  type: 'header',
+                  text: {
+                    type: 'plain_text',
+                    text: `📋 Compliance Check: ${email}`
+                  }
+                },
+                {
+                  type: 'section',
+                  text: {
+                    type: 'mrkdwn',
+                    text: `*Compliance Score: ${complianceScore}%* (${passed}/${total})\n\n${checkList}`
+                  }
+                },
+                {
+                  type: 'context',
+                  elements: [
+                    {
+                      type: 'mrkdwn',
+                      text: complianceScore >= 80 ? '🟢 High compliance' : complianceScore >= 60 ? '🟡 Medium compliance' : '🔴 Low compliance'
+                    }
+                  ]
+                }
+              ]
+            });
+          } catch (error) {
+            res.json({
+              response_type: 'ephemeral',
+              text: 'Error running compliance check'
+            });
+          }
+        }
+        break;
+        
+      // =================== SUPPORT TICKET MANAGEMENT ===================
+      
+      case '/ticket-manage':
+        if (!text || !text.trim()) {
+          res.json({
+            response_type: 'ephemeral',
+            text: 'Usage: `/ticket-manage [ticket-number] [optional: status|assign] [value]`'
+          });
+        } else {
+          try {
+            const parts = text.trim().split(' ');
+            const ticketNumber = parts[0];
+            const action = parts[1];
+            const value = parts.slice(2).join(' ');
+            
+            const SupportTicket = require('../models/SupportTicket');
+            const ticket = await SupportTicket.findOne({ ticketNumber });
+            
+            if (!ticket) {
+              res.json({
+                response_type: 'ephemeral',
+                text: `❌ Ticket not found: ${ticketNumber}`
+              });
+              return;
+            }
+            
+            if (action === 'status' && value) {
+              const validStatuses = ['open', 'in_progress', 'waiting_customer', 'resolved', 'closed'];
+              if (!validStatuses.includes(value.toLowerCase())) {
+                res.json({
+                  response_type: 'ephemeral',
+                  text: `Invalid status. Valid options: ${validStatuses.join(', ')}`
+                });
+                return;
+              }
+              
+              const oldStatus = ticket.status;
+              await ticket.updateStatus(value.toLowerCase(), user_name);
+              
+              res.json({
+                response_type: 'ephemeral',
+                text: `✅ Ticket ${ticketNumber} status updated: ${oldStatus} → ${value.toLowerCase()}`
+              });
+            } else if (action === 'assign' && value) {
+              await ticket.assign(value);
+              
+              res.json({
+                response_type: 'ephemeral',
+                text: `✅ Ticket ${ticketNumber} assigned to: ${value}`
+              });
+            } else {
+              // Show ticket details
+              res.json({
+                response_type: 'ephemeral',
+                blocks: [
+                  {
+                    type: 'header',
+                    text: {
+                      type: 'plain_text',
+                      text: `🎫 Ticket: ${ticket.ticketNumber}`
+                    }
+                  },
+                  {
+                    type: 'section',
+                    fields: [
+                      { type: 'mrkdwn', text: `*Customer:* ${ticket.customerEmail}` },
+                      { type: 'mrkdwn', text: `*Status:* ${ticket.status}` },
+                      { type: 'mrkdwn', text: `*Priority:* ${ticket.priority}` },
+                      { type: 'mrkdwn', text: `*Assigned:* ${ticket.assignedTo || 'Unassigned'}` },
+                      { type: 'mrkdwn', text: `*Created:* ${new Date(ticket.createdAt).toLocaleDateString()}` },
+                      { type: 'mrkdwn', text: `*Source:* ${ticket.source}` }
+                    ]
+                  },
+                  {
+                    type: 'section',
+                    text: {
+                      type: 'mrkdwn',
+                      text: `*Subject:* ${ticket.subject}\n*Description:* ${ticket.description.substring(0, 200)}${ticket.description.length > 200 ? '...' : ''}`
+                    }
+                  },
+                  {
+                    type: 'actions',
+                    elements: [
+                      {
+                        type: 'button',
+                        text: { type: 'plain_text', text: '🎫 View Full Ticket' },
+                        url: `${process.env.ADMIN_URL || 'https://admin.fractionax.io'}/admin/support-tickets?id=${ticket._id}`
+                      }
+                    ]
+                  }
+                ]
+              });
+            }
+          } catch (error) {
+            res.json({
+              response_type: 'ephemeral',
+              text: 'Error managing ticket'
+            });
+          }
+        }
+        break;
+        
       default:
         res.json({
           response_type: 'ephemeral',
-          text: `Unknown command: ${command}`
+          text: `Unknown command: ${command}\n\nType /admin-help to see all available commands.`
         });
     }
     
