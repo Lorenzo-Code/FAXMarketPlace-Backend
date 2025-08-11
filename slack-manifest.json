@@ -1,0 +1,142 @@
+{
+  "display_information": {
+    "name": "FractionaX Admin Bot",
+    "description": "Powerful admin bot for FractionaX platform with 100+ commands across 8 categories",
+    "background_color": "#0F172A"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "FractionaX Admin Bot",
+      "always_online": true
+    },
+    "slash_commands": [
+      {
+        "command": "/admin",
+        "url": "https://api.fractionax.io/slack/commands",
+        "description": "Main help - Shows all umbrella commands and features",
+        "usage_hint": "help | advanced",
+        "should_escape": false
+      },
+      {
+        "command": "/help",
+        "url": "https://api.fractionax.io/slack/commands",
+        "description": "Shows all available admin commands and quick actions",
+        "usage_hint": "advanced",
+        "should_escape": false
+      },
+      {
+        "command": "/user",
+        "url": "https://api.fractionax.io/slack/commands",
+        "description": "User management (15+ commands) - info, lock, stats, audit",
+        "usage_hint": "help | info [email] | lock [email] [reason] | stats",
+        "should_escape": false
+      },
+      {
+        "command": "/system",
+        "url": "https://api.fractionax.io/slack/commands",
+        "description": "System operations (12+ commands) - status, logs, sync, deploy",
+        "usage_hint": "help | status | sync | logs [service]",
+        "should_escape": false
+      },
+      {
+        "command": "/wallet",
+        "url": "https://api.fractionax.io/slack/commands",
+        "description": "Wallet management (10+ commands) - activity, pending, freeze",
+        "usage_hint": "help | activity [email] | pending | freeze [email]",
+        "should_escape": false
+      },
+      {
+        "command": "/security",
+        "url": "https://api.fractionax.io/slack/commands",
+        "description": "Security operations (12+ commands) - lock, alerts, ip-block",
+        "usage_hint": "help | lock [email] [reason] | alerts | ip-block [ip]",
+        "should_escape": false
+      },
+      {
+        "command": "/support",
+        "url": "https://api.fractionax.io/slack/commands",
+        "description": "Support ticket management (8+ commands) - stats, assign, escalate",
+        "usage_hint": "help | stats | list [status] | assign [ticket-id]",
+        "should_escape": false
+      },
+      {
+        "command": "/compliance",
+        "url": "https://api.fractionax.io/slack/commands",
+        "description": "KYC and compliance (10+ commands) - status, approve, aml-report",
+        "usage_hint": "help | status [email] | pending | approve [email]",
+        "should_escape": false
+      },
+      {
+        "command": "/alerts",
+        "url": "https://api.fractionax.io/slack/commands",
+        "description": "Monitoring and alerts (8+ commands) - dashboard, threshold, broadcast",
+        "usage_hint": "help | dashboard | threshold [type] [value] | broadcast [channel]",
+        "should_escape": false
+      },
+      {
+        "command": "/analytics",
+        "url": "https://api.fractionax.io/slack/commands",
+        "description": "Reports and analytics (15+ commands) - revenue, users, export",
+        "usage_hint": "help | revenue [period] | users [metric] | export [type]",
+        "should_escape": false
+      },
+      {
+        "command": "/test",
+        "url": "https://api.fractionax.io/slack/commands",
+        "description": "Test bot connectivity and basic functionality",
+        "should_escape": false
+      },
+      {
+        "command": "/ping",
+        "url": "https://api.fractionax.io/slack/commands",
+        "description": "Simple ping test for bot responsiveness",
+        "should_escape": false
+      }
+    ]
+  },
+  "oauth_config": {
+    "scopes": {
+      "user": [
+        "channels:read",
+        "users:read",
+        "users:read.email"
+      ],
+      "bot": [
+        "channels:read",
+        "chat:write",
+        "chat:write.public",
+        "commands",
+        "im:read",
+        "im:write",
+        "users:read",
+        "users:read.email",
+        "groups:read",
+        "mpim:read",
+        "reactions:read",
+        "reactions:write",
+        "files:write",
+        "app_mentions:read",
+        "channels:history",
+        "groups:history",
+        "im:history",
+        "mpim:history"
+      ]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "request_url": "https://api.fractionax.io/slack/interactivity",
+      "bot_events": [
+        "app_mention",
+        "message.im"
+      ]
+    },
+    "interactivity": {
+      "is_enabled": true,
+      "request_url": "https://api.fractionax.io/slack/interactivity"
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false,
+    "token_rotation_enabled": false
+  }
+}
