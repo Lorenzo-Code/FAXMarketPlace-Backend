@@ -31,8 +31,7 @@ const verifyHelpScoutSignature = (req, res, next) => {
 };
 
 /**
- * Enhanced Slack signature verification middleware
- * Properly handles raw body capture and parsing for secure verification
+ * Enhanced Slack signature verification for Cloudflare
  */
 const verifySlackSignature = (req, res, next) => {
   const slackSignature = req.get('X-Slack-Signature');
@@ -58,58 +57,92 @@ const verifySlackSignature = (req, res, next) => {
     return res.status(401).json({ error: 'Request timestamp too old' });
   }
 
-  // Get raw body - Express should have captured this
-  const rawBody = req.rawBody || req.body || '';
-  let bodyString;
-  
-  if (typeof rawBody === 'string') {
-    bodyString = rawBody;
-  } else if (Buffer.isBuffer(rawBody)) {
-    bodyString = rawBody.toString('utf8');
-  } else {
-    // Reconstruct from parsed form data
-    const params = new URLSearchParams();
-    for (const [key, value] of Object.entries(rawBody)) {
-      params.append(key, value);
+  try {
+    // Get body string for signature verification
+    let bodyString = '';
+    
+    if (req.rawBody) {
+      bodyString = req.rawBody;
+    } else if (req.body) {
+      // Reconstruct from parsed form data (Cloudflare fallback)
+      if (typeof req.body === 'string') {
+        bodyString = req.body;
+      } else {
+        const params = new URLSearchParams();
+        for (const [key, value] of Object.entries(req.body)) {
+          params.append(key, value);
+        }
+        bodyString = params.toString();
+      }
     }
-    bodyString = params.toString();
+
+    // Create signature
+    const basestring = `v0:${timestamp}:${bodyString}`;
+    const expectedSignature = 'v0=' + crypto
+      .createHmac('sha256', signingSecret)
+      .update(basestring)
+      .digest('hex');
+
+    // Secure comparison to prevent timing attacks
+    const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+    const receivedBuffer = Buffer.from(slackSignature, 'utf8');
+    
+    if (expectedBuffer.length !== receivedBuffer.length || 
+        !crypto.timingSafeEqual(expectedBuffer, receivedBuffer)) {
+      console.warn('❌ Slack webhook: Invalid signature');
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+
+    console.log('✅ Slack webhook signature verified successfully');
+    next();
+  } catch (error) {
+    console.error('❌ Signature verification error:', error);
+    return res.status(401).json({ error: 'Signature verification failed' });
   }
-
-  // Create signature
-  const basestring = `v0:${timestamp}:${bodyString}`;
-  const expectedSignature = 'v0=' + crypto
-    .createHmac('sha256', signingSecret)
-    .update(basestring)
-    .digest('hex');
-
-  // Secure comparison to prevent timing attacks
-  const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
-  const receivedBuffer = Buffer.from(slackSignature, 'utf8');
-  
-  if (expectedBuffer.length !== receivedBuffer.length || 
-      !crypto.timingSafeEqual(expectedBuffer, receivedBuffer)) {
-    console.warn('❌ Slack webhook: Invalid signature');
-    console.warn(`Expected: ${expectedSignature}`);
-    console.warn(`Received: ${slackSignature}`);
-    console.warn(`Body length: ${bodyString.length}`);
-    console.warn(`Timestamp: ${timestamp}`);
-    return res.status(401).json({ error: 'Invalid signature' });
-  }
-
-  console.log('✅ Slack webhook signature verified successfully');
-  next();
 };
 
 /**
- * Middleware to capture raw body before parsing
+ * Cloudflare-compatible raw body capture
+ * Handles Cloudflare's request modifications properly
  */
 const captureRawBody = (req, res, next) => {
+  // Skip if body already captured
+  if (req.rawBody) {
+    return next();
+  }
+
   const chunks = [];
-  req.on('data', chunk => chunks.push(chunk));
+  let hasData = false;
+
+  req.on('data', chunk => {
+    chunks.push(chunk);
+    hasData = true;
+  });
+
   req.on('end', () => {
-    req.rawBody = Buffer.concat(chunks).toString('utf8');
+    if (hasData) {
+      req.rawBody = Buffer.concat(chunks).toString('utf8');
+    } else {
+      // Fallback for when Cloudflare pre-processes the body
+      req.rawBody = '';
+    }
     next();
   });
+
+  req.on('error', (err) => {
+    console.error('❌ Raw body capture error:', err);
+    req.rawBody = '';
+    next();
+  });
+
+  // Timeout protection
+  setTimeout(() => {
+    if (!hasData) {
+      console.warn('⚠️ Raw body capture timeout, proceeding...');
+      req.rawBody = '';
+      next();
+    }
+  }, 1000); // 1 second timeout
 };
 
 /**
