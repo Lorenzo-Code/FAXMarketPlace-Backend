@@ -151,7 +151,7 @@ app.use("/api/attom-data", require('./routes/attomData'));
 app.use("/api/token-prices", require('./routes/tokenPrices'));
 app.use("/api/uploads", require('./routes/api/uploads'));
 app.use("/api/properties", require('./routes/api/properties'));
-app.use("/api/test", require('./routes/api/testRedis'));
+// app.use("/api/test", require('./routes/api/testRedis')); // Commented out - file moved to scripts
 app.use("/api/suggested", require("./routes/api/suggestedRoutes"));
 app.use("/api/google-maps", require('./routes/api/googleMapsTest')); // Google Maps testing and autocomplete
 
