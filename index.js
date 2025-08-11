@@ -155,6 +155,8 @@ app.use("/api/test", require('./routes/api/testRedis'));
 app.use("/api/suggested", require("./routes/api/suggestedRoutes"));
 app.use("/api/google-maps", require('./routes/api/googleMapsTest')); // Google Maps testing and autocomplete
 
+// ✅ Slack Routes - Direct routes without /api prefix for Slack webhook URLs
+app.use("/slack", require('./routes/webhooks')); // Slack slash commands and interactivity
 
 // ✅ AI Routes
 const searchRouter = require('./routes/api/ai/search');
