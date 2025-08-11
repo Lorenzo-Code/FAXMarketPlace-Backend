@@ -236,6 +236,7 @@ async function handleSlashCommand(req, res) {
       // ==== MAIN HELP COMMAND ====
       case '/admin':
       case '/help':
+      case '/admin-help':  // Backward compatibility
       default:
         return handleMainHelp(res, subcommand);
     }

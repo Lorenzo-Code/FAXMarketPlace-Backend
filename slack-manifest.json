@@ -81,6 +81,13 @@
         "should_escape": false
       },
       {
+        "command": "/admin-help",
+        "url": "https://api.fractionax.io/slack/commands",
+        "description": "[LEGACY] Shows admin commands (use /admin instead)",
+        "usage_hint": "Redirects to /admin",
+        "should_escape": false
+      },
+      {
         "command": "/test",
         "url": "https://api.fractionax.io/slack/commands",
         "description": "Test bot connectivity and basic functionality",
