@@ -5,9 +5,9 @@
 
 echo "🚀 Starting manual deployment..."
 
-# Navigate to the existing FAXMarketPlace-Backend directory on DigitalOcean
-cd /root/FAXMarketPlace-Backend
-echo "📁 Using existing FAXMarketPlace-Backend directory on DigitalOcean"
+# Navigate to the fractionax-backend directory on DigitalOcean
+cd /root/fractionax-backend
+echo "📁 Using fractionax-backend directory on DigitalOcean"
 
 # Show current remote URL
 echo "🔗 Current remote URL: $(git remote get-url origin)"
@@ -54,7 +54,7 @@ docker build --no-cache -t fax-backend .
 
 # Run new container
 echo "🚀 Starting new container..."
-docker run -d --env-file .env -p 8000:8000 --name fax-api fax-backend
+docker run -d --env-file .env -p 8000:5000 --name fax-api fax-backend
 
 # Wait for container to start
 sleep 10

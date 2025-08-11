@@ -1,0 +1,56 @@
+# Manual Deployment Commands for DigitalOcean Server
+# Copy and paste these commands one by one into your SSH session
+
+# 1. Navigate to the existing directory
+cd /root/FAXMarketPlace-Backend
+
+# 2. Check current status
+pwd
+git remote get-url origin
+git branch --show-current
+
+# 3. Update remote URL to point to your new repository
+git remote set-url origin https://github.com/Lorenzo-Code/FractionaX-Backend.git
+
+# 4. Verify the remote URL was updated
+git remote get-url origin
+
+# 5. Fetch latest changes from the new repository
+git fetch origin main
+
+# 6. Show current vs remote commits
+echo "Current commit: $(git rev-parse HEAD)"
+echo "Remote commit: $(git rev-parse origin/main)"
+
+# 7. Hard reset to get the latest code
+git reset --hard origin/main
+
+# 8. Verify we got the latest code
+echo "Updated to commit: $(git rev-parse HEAD)"
+git log -1 --pretty=format:'%s'
+
+# 9. Stop existing Docker containers
+docker ps -q --filter "publish=8000" | xargs -r docker stop
+docker ps -aq --filter "publish=8000" | xargs -r docker rm
+docker rm -f fax-api || true
+
+# 10. Clean up Docker images
+docker image prune -f
+docker container prune -f
+
+# 11. Build fresh Docker image (no cache)
+docker build --no-cache -t fax-backend .
+
+# 12. Run new container
+docker run -d --env-file .env -p 8000:8000 --name fax-api fax-backend
+
+# 13. Wait and check status
+sleep 10
+docker ps | grep fax-api
+docker logs --tail 20 fax-api
+
+# 14. Test the API
+curl -X GET http://localhost:8000/
+
+echo "✅ Manual deployment complete!"
+echo "🌍 API should be available at: https://api.fractionax.io"

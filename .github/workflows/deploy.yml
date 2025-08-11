@@ -22,8 +22,8 @@ jobs:
           username: root
           key: ${{ secrets.DROPLET_SSH_KEY }}
           script: |
-            # Navigate to the existing FAXMarketPlace-Backend directory on DigitalOcean
-            cd /root/FAXMarketPlace-Backend
+            # Navigate to the fractionax-backend directory on DigitalOcean
+            cd /root/fractionax-backend
             echo "📁 Current directory: $(pwd)"
             
             # Show current remote URL
@@ -58,7 +58,7 @@ jobs:
             
             # Run new container
             echo "🚀 Starting new container..."
-            docker run -d --env-file .env -p 8000:8000 --name fax-api fax-backend
+            docker run -d --env-file .env -p 8000:5000 --name fax-api fax-backend
             
             # Wait for container to start and check status
             sleep 10
