@@ -1183,6 +1183,30 @@ router.post('/slash-commands', captureRawBody, express.urlencoded({ extended: tr
 router.post('/commands-insecure', express.urlencoded({ extended: true }), handleSlashCommand);
 
 /**
+ * @route   POST /slack/emergency-help
+ * @desc    Emergency admin-help endpoint that bypasses all middleware
+ * @access  Public (NO verification - emergency only)
+ */
+router.post('/emergency-help', (req, res) => {
+  console.log('🚨 Emergency help endpoint called');
+  
+  // Respond immediately with minimal processing
+  res.status(200).json({
+    response_type: 'ephemeral',
+    text: '🛠️ *FractionaX Admin Commands (Emergency Response)*\n\n' +
+          '*🔧 System:* `/system [status|health|sync|cache]`\n' +
+          '*👤 Users:* `/user [info|search|suspend|unlock|sessions|audit|metrics|debug] [email]`\n' +
+          '*🔐 Security:* `/security [reset-password|toggle-2fa|alert|ip-block|lock|unlock|logins] [params]`\n' +
+          '*💰 Wallets:* `/wallet [info|manage|freeze|activity|withdrawals|metrics] [email]`\n' +
+          '*🛡️ KYC:* `/kyc [status|documents|compliance] [email]`\n' +
+          '*🎫 Support:* `/support [create|stats|manage] [params]`\n' +
+          '*🚨 Alerts:* `/alert [threshold|broadcast] [params]`\n\n' +
+          '*📚 Examples:*\n• `/system status` - Check system health\n• `/user info john@example.com` - Get user details\n\n' +
+          '🚨 Emergency endpoint - contact admin if main commands fail'
+  });
+});
+
+/**
  * @route   POST /slack/interactivity
  * @desc    Handle Slack interactive components and events
  * @access  Public (verified by signature)
