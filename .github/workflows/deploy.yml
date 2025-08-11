@@ -22,7 +22,18 @@ jobs:
           username: root
           key: ${{ secrets.DROPLET_SSH_KEY }}
           script: |
-            cd /root/FAXMarketPlace-Backend
+            # Handle repository name change
+            if [ -d "/root/FractionaX-Backend" ]; then
+              cd /root/FractionaX-Backend
+            elif [ -d "/root/FAXMarketPlace-Backend" ]; then
+              cd /root/FAXMarketPlace-Backend
+              # Update remote URL to new repository name
+              git remote set-url origin https://github.com/Lorenzo-Code/FractionaX-Backend.git
+            else
+              # Clone the repository if it doesn't exist
+              git clone https://github.com/Lorenzo-Code/FractionaX-Backend.git /root/FractionaX-Backend
+              cd /root/FractionaX-Backend
+            fi
             git pull origin main
             # Stop and remove any existing containers using port 8000
             docker ps -q --filter "publish=8000" | xargs -r docker stop
