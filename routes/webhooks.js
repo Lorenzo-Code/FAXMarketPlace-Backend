@@ -93,11 +93,35 @@ router.post('/helpscout', express.raw({ type: 'application/json' }), verifyHelpS
  * @desc    Handle Slack interactive components and events
  * @access  Public (verified by signature)
  */
-router.post('/slack', express.urlencoded({ extended: true }), verifySlackSignature, async (req, res) => {
+
+// Special middleware to handle both JSON and form data
+const slackBodyParser = (req, res, next) => {
+  // Check if it's the URL verification challenge (JSON)
+  if (req.get('Content-Type') === 'application/json') {
+    return express.json()(req, res, next);
+  }
+  // Otherwise it's form data (interactive components, events)
+  return express.urlencoded({ extended: true })(req, res, next);
+};
+
+// Conditional signature verification - skip for URL verification
+const conditionalSlackSignatureVerification = (req, res, next) => {
+  // Skip signature verification for URL verification challenge
+  if (req.body && req.body.type === 'url_verification') {
+    return next();
+  }
+  // Apply normal signature verification for all other requests
+  return verifySlackSignature(req, res, next);
+};
+
+router.post('/slack', slackBodyParser, conditionalSlackSignatureVerification, async (req, res) => {
   try {
+    console.log('📨 Slack webhook received:', req.body);
+    
     // Handle URL verification challenge
     if (req.body.type === 'url_verification') {
-      return res.json({ challenge: req.body.challenge });
+      console.log('✅ Slack URL verification challenge received');
+      return res.status(200).json({ challenge: req.body.challenge });
     }
 
     // Handle interactive components (button clicks, etc.)
