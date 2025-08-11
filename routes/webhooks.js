@@ -681,7 +681,7 @@ const conditionalSlackSignatureVerification = (req, res, next) => {
   return verifySlackSignature(req, res, next);
 };
 
-router.post('/interactivity', slackBodyParser, conditionalSlackSignatureVerification, async (req, res) => {
+router.post('/interactivity', slackBodyParser, async (req, res) => {
   try {
     console.log('📨 Slack interactivity webhook received:', req.body);
     
