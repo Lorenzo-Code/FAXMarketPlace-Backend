@@ -1162,25 +1162,109 @@ async function handleSlashCommand(req, res) {
 }
 
 /**
+ * Simple Slack form parser middleware
+ * Uses URLSearchParams to handle Slack's form encoding reliably
+ */
+const slackFormParserMiddleware = (req, res, next) => {
+  if (req.method !== 'POST') {
+    return next();
+  }
+  
+  const chunks = [];
+  req.on('data', chunk => chunks.push(chunk));
+  req.on('end', () => {
+    try {
+      const rawBody = Buffer.concat(chunks).toString('utf8');
+      req.rawBody = rawBody;
+      
+      // Parse form data using URLSearchParams (most reliable for Slack)
+      const parsed = new URLSearchParams(rawBody);
+      req.body = {};
+      for (const [key, value] of parsed) {
+        req.body[key] = value;
+      }
+      
+      console.log('✅ Slack form parsed:', Object.keys(req.body));
+      if (req.body.command) {
+        console.log(`📥 Command: ${req.body.command}`);
+      }
+      
+      next();
+    } catch (error) {
+      console.error('❌ Form parsing error:', error);
+      req.body = {};
+      next();
+    }
+  });
+  
+  req.on('error', (error) => {
+    console.error('❌ Request error:', error);
+    next(error);
+  });
+};
+
+/**
  * @route   POST /slack/commands
  * @desc    Handle Slack slash commands with signature verification
  * @access  Public (verified by signature)
  */
-router.post('/commands', captureRawBody, express.urlencoded({ extended: true }), verifySlackSignature, handleSlashCommand);
+router.post('/commands', slackFormParserMiddleware, verifySlackSignature, handleSlashCommand);
 
 /**
  * @route   POST /slack/slash-commands (alternative route)
  * @desc    Handle Slack slash commands with signature verification
  * @access  Public (verified by signature)
  */
-router.post('/slash-commands', captureRawBody, express.urlencoded({ extended: true }), verifySlackSignature, handleSlashCommand);
+router.post('/slash-commands', slackFormParserMiddleware, verifySlackSignature, handleSlashCommand);
+
+/**
+ * Custom Slack form parser middleware
+ * Handles Slack's specific form encoding that Express urlencoded sometimes fails to parse
+ */
+const slackFormParser = (req, res, next) => {
+  // First capture raw body
+  const chunks = [];
+  req.on('data', chunk => chunks.push(chunk));
+  req.on('end', () => {
+    const rawBody = Buffer.concat(chunks).toString('utf8');
+    req.rawBody = rawBody;
+    
+    // Parse form data manually if Express parsing failed
+    if (!req.body || !req.body.command) {
+      try {
+        const parsed = new URLSearchParams(rawBody);
+        req.body = {};
+        for (const [key, value] of parsed) {
+          req.body[key] = value;
+        }
+        console.log('✅ Slack form parsed manually:', Object.keys(req.body));
+      } catch (error) {
+        console.warn('⚠️ Manual form parsing failed:', error);
+      }
+    }
+    
+    next();
+  });
+};
 
 /**
  * @route   POST /slack/commands-insecure
  * @desc    Handle Slack slash commands WITHOUT signature verification (emergency fallback)
  * @access  Public (NO verification - use only for testing)
  */
-router.post('/commands-insecure', express.urlencoded({ extended: true }), handleSlashCommand);
+router.post('/commands-insecure', 
+  express.urlencoded({ extended: true, limit: '1mb' }),
+  (req, res, next) => {
+    console.log('🔍 Form data received:', Object.keys(req.body));
+    if (req.body.command) {
+      console.log('📥 Command:', req.body.command);
+    } else {
+      console.warn('⚠️ No command found in form data');
+      console.log('Raw body keys:', Object.keys(req.body));
+    }
+    next();
+  },
+  handleSlashCommand);
 
 /**
  * @route   POST /slack/emergency-help
