@@ -1,0 +1,116 @@
+{
+    "display_information": {
+        "name": "FractionaX Ops Bot",
+        "description": "Internal operations bot for FractionaX",
+        "background_color": "#0e1b29",
+        "long_description": "The FractionaX Ops Bot connects our backend to Slack, providing real-time visibility and control over support tickets, compliance reviews, operational tasks, and system alerts.\r\nAssign, update, and resolve issues directly from Slack while keeping the FractionaX admin panel in sync.\r\nDesigned for internal use to streamline workflows and centralize team communication."
+    },
+    "features": {
+        "bot_user": {
+            "display_name": "FractionaX Ops Bot",
+            "always_online": true
+        },
+        "slash_commands": [
+            {
+                "command": "/admin-help",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Show all available admin commands and usage guide",
+                "should_escape": false
+            },
+            {
+                "command": "/system",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "System operations: status, health, sync, cache",
+                "usage_hint": "[status|health|sync|cache] [optional-params]",
+                "should_escape": false
+            },
+            {
+                "command": "/user",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "User management: info, search, suspend, unlock, sessions, audit",
+                "usage_hint": "[info|search|suspend|unlock|sessions|audit|metrics|debug] [email/params]",
+                "should_escape": false
+            },
+            {
+                "command": "/security",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Security operations: reset passwords, 2FA, alerts, IP blocking",
+                "usage_hint": "[reset-password|toggle-2fa|alert|ip-block|lock|unlock|logins] [params]",
+                "should_escape": false
+            },
+            {
+                "command": "/wallet",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Wallet & token management: info, freeze, activity, withdrawals",
+                "usage_hint": "[info|manage|freeze|activity|withdrawals|metrics] [email/params]",
+                "should_escape": false
+            },
+            {
+                "command": "/kyc",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "KYC & compliance: status, documents, compliance checks",
+                "usage_hint": "[status|documents|compliance] [email] [optional-action]",
+                "should_escape": false
+            },
+            {
+                "command": "/support",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Support ticket management: create, stats, manage tickets",
+                "usage_hint": "[create|stats|manage] [ticket-params]",
+                "should_escape": false
+            },
+            {
+                "command": "/alert",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Alert & notification management: thresholds, broadcasts",
+                "usage_hint": "[threshold|broadcast] [type] [value/message]",
+                "should_escape": false
+            },
+            {
+                "command": "/test",
+                "url": "https://api.fractionax.io/slack/commands",
+                "description": "Test bot connectivity and functionality",
+                "should_escape": false
+            }
+        ],
+        "unfurl_domains": [
+            "fractionax.io"
+        ]
+    },
+    "oauth_config": {
+        "scopes": {
+            "bot": [
+                "chat:write",
+                "chat:write.public",
+                "reactions:read",
+                "channels:read",
+                "groups:read",
+                "channels:history",
+                "groups:history",
+                "commands",
+                "users:read",
+                "users:read.email",
+                "app_mentions:read",
+                "links:read"
+            ]
+        }
+    },
+    "settings": {
+        "event_subscriptions": {
+            "request_url": "https://api.fractionax.io/slack/interactivity",
+            "bot_events": [
+                "app_mention",
+                "link_shared",
+                "message.channels",
+                "message.groups"
+            ]
+        },
+        "interactivity": {
+            "is_enabled": true,
+            "request_url": "https://api.fractionax.io/slack/interactivity"
+        },
+        "org_deploy_enabled": false,
+        "socket_mode_enabled": false,
+        "token_rotation_enabled": false
+    }
+}
