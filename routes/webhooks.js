@@ -229,6 +229,14 @@ async function handleSlashCommand(req, res) {
         });
         break;
         
+      case '/system':
+        // Redirect /system to /system-status for convenience
+        res.json({
+          response_type: 'ephemeral',
+          text: '💡 Use `/system-status` for system information or `/admin-help` to see all commands.'
+        });
+        break;
+        
       case '/system-status':
         try {
           const mongoose = require('mongoose');
