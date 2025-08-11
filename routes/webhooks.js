@@ -737,4 +737,17 @@ router.get('/test', (req, res) => {
   });
 });
 
+/**
+ * @route   POST /test-slack
+ * @desc    Test Slack webhook without signature verification (for debugging)
+ * @access  Public
+ */
+router.post('/test-slack', express.urlencoded({ extended: true }), (req, res) => {
+  console.log('🧪 Test Slack webhook received:', req.body);
+  res.json({
+    response_type: 'ephemeral',
+    text: '✅ Test endpoint working! Server can receive Slack requests.\n\nEndpoint: `/test-slack`\nTimestamp: ' + new Date().toISOString()
+  });
+});
+
 module.exports = router;
