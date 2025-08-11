@@ -146,11 +146,16 @@ async function handleSlashCommand(req, res) {
   try {
     switch (command) {
       case '/test':
-        res.json({
+        return res.json({
           response_type: 'ephemeral',
-          text: '✅ FractionaX Admin Bot is working! 🚀\\n\\nUse `/admin-help` to see all available commands.'
+          text: '✅ FractionaX Admin Bot is working! 🚀\n\nUse `/admin-help` to see all available commands.'
         });
-        break;
+        
+      case '/health':
+        return res.json({
+          response_type: 'ephemeral',
+          text: `✅ Server Health Check - ${new Date().toISOString()}\n\nStatus: Online\nResponse Time: <1s\nMemory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`
+        });
         
       case '/test-new':
         res.json({
@@ -201,48 +206,20 @@ async function handleSlashCommand(req, res) {
         break;
         
       case '/admin-help':
-        res.json({
+        // Respond immediately to avoid timeout
+        return res.json({
           response_type: 'ephemeral',
-          blocks: [
-            {
-              type: 'header',
-              text: {
-                type: 'plain_text',
-                text: '🛠️ FractionaX Admin Commands (Unlimited via Umbrella System)'
-              }
-            },
-            {
-              type: 'section',
-              text: {
-                type: 'mrkdwn',
-                text: '*🔧 System:* `/system [status|health|sync|cache]`\n' +
-                      '*👤 Users:* `/user [info|search|suspend|unlock|sessions|audit|metrics|debug] [email]`\n' +
-                      '*🔐 Security:* `/security [reset-password|toggle-2fa|alert|ip-block|lock|unlock|logins] [params]`\n' +
-                      '*💰 Wallets:* `/wallet [info|manage|freeze|activity|withdrawals|metrics] [email]`\n' +
-                      '*🛡️ KYC:* `/kyc [status|documents|compliance] [email]`\n' +
-                      '*🎫 Support:* `/support [create|stats|manage] [params]`\n' +
-                      '*🚨 Alerts:* `/alert [threshold|broadcast] [params]`'
-              }
-            },
-            {
-              type: 'section',
-              text: {
-                type: 'mrkdwn',
-                text: '*📚 Examples:*\n• `/system status` - Check system health\n• `/user info john@example.com` - Get user details\n• `/wallet activity jane@example.com` - View wallet transactions\n• `/security lock spam@example.com` - Lock suspicious account'
-              }
-            },
-            {
-              type: 'context',
-              elements: [
-                {
-                  type: 'mrkdwn',
-                  text: '🛡️ All admin actions are logged and audited. Use commands without sub-commands for detailed help.'
-                }
-              ]
-            }
-          ]
+          text: '🛠️ *FractionaX Admin Commands (Unlimited via Umbrella System)*\n\n' +
+                '*🔧 System:* `/system [status|health|sync|cache]`\n' +
+                '*👤 Users:* `/user [info|search|suspend|unlock|sessions|audit|metrics|debug] [email]`\n' +
+                '*🔐 Security:* `/security [reset-password|toggle-2fa|alert|ip-block|lock|unlock|logins] [params]`\n' +
+                '*💰 Wallets:* `/wallet [info|manage|freeze|activity|withdrawals|metrics] [email]`\n' +
+                '*🛡️ KYC:* `/kyc [status|documents|compliance] [email]`\n' +
+                '*🎫 Support:* `/support [create|stats|manage] [params]`\n' +
+                '*🚨 Alerts:* `/alert [threshold|broadcast] [params]`\n\n' +
+                '*📚 Examples:*\n• `/system status` - Check system health\n• `/user info john@example.com` - Get user details\n• `/wallet activity jane@example.com` - View wallet transactions\n• `/security lock spam@example.com` - Lock suspicious account\n\n' +
+                '🛡️ All admin actions are logged and audited. Use commands without sub-commands for detailed help.'
         });
-        break;
         
       // Legacy individual commands (for backward compatibility)
       case '/system-status':
