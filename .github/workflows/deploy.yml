@@ -22,18 +22,16 @@ jobs:
           username: root
           key: ${{ secrets.DROPLET_SSH_KEY }}
           script: |
-            # Handle repository name change
-            if [ -d "/root/FractionaX-Backend" ]; then
-              cd /root/FractionaX-Backend
-            elif [ -d "/root/FAXMarketPlace-Backend" ]; then
-              cd /root/FAXMarketPlace-Backend
-              # Update remote URL to new repository name
-              git remote set-url origin https://github.com/Lorenzo-Code/FractionaX-Backend.git
-            else
-              # Clone the repository if it doesn't exist
-              git clone https://github.com/Lorenzo-Code/FractionaX-Backend.git /root/FractionaX-Backend
-              cd /root/FractionaX-Backend
-            fi
+            # Navigate to the existing FAXMarketPlace-Backend directory on DigitalOcean
+            cd /root/FAXMarketPlace-Backend
+            echo "📁 Current directory: $(pwd)"
+            
+            # Show current remote URL
+            echo "🔗 Current remote URL: $(git remote get-url origin)"
+            
+            # Update remote URL to the new repository location (GitHub redirect)
+            git remote set-url origin https://github.com/Lorenzo-Code/FractionaX-Backend.git
+            echo "✅ Updated remote URL to: $(git remote get-url origin)"
             # Fetch and hard reset to ensure latest code
             git fetch origin main
             echo "📝 Current commit: $(git rev-parse HEAD)"

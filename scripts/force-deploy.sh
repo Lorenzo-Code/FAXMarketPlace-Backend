@@ -5,22 +5,16 @@
 
 echo "🚀 Starting manual deployment..."
 
-# Navigate to the correct directory (handling repository name changes)
-if [ -d "/root/FractionaX-Backend" ]; then
-    cd /root/FractionaX-Backend
-    echo "📁 Using FractionaX-Backend directory"
-elif [ -d "/root/FAXMarketPlace-Backend" ]; then
-    cd /root/FAXMarketPlace-Backend
-    echo "📁 Using FAXMarketPlace-Backend directory (legacy)"
-    # Update remote URL to new repository name
-    git remote set-url origin https://github.com/Lorenzo-Code/FractionaX-Backend.git
-    echo "🔗 Updated remote URL to new repository"
-else
-    echo "❌ No repository directory found!"
-    echo "🔄 Cloning fresh repository..."
-    git clone https://github.com/Lorenzo-Code/FractionaX-Backend.git /root/FractionaX-Backend
-    cd /root/FractionaX-Backend
-fi
+# Navigate to the existing FAXMarketPlace-Backend directory on DigitalOcean
+cd /root/FAXMarketPlace-Backend
+echo "📁 Using existing FAXMarketPlace-Backend directory on DigitalOcean"
+
+# Show current remote URL
+echo "🔗 Current remote URL: $(git remote get-url origin)"
+
+# Update remote URL to the new repository location
+git remote set-url origin https://github.com/Lorenzo-Code/FractionaX-Backend.git
+echo "✅ Updated remote URL to: $(git remote get-url origin)"
 
 echo "📦 Current directory: $(pwd)"
 echo "🔍 Current branch: $(git branch --show-current)"
