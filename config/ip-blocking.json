@@ -1,0 +1,35 @@
+{
+  "autoBlockThreshold": 85,
+  "reviewThreshold": 70,
+  "maxRequestsPerMinute": 60,
+  "maxFailedAttemptsPerHour": 10,
+  "maxConnectionsPerIP": 5,
+  "blockedCountries": ["CN", "RU", "KP", "IR", "SY"],
+  "allowedCountries": [],
+  "temporaryBlockDuration": 86400000,
+  "permanentBlockThreshold": 3,
+  "whitelist": [
+    "127.0.0.1",
+    "::1",
+    "localhost"
+  ],
+  "blockCategories": {
+    "malware": { "severity": 95, "action": "block" },
+    "botnet": { "severity": 90, "action": "block" },
+    "scanning": { "severity": 75, "action": "review" },
+    "spam": { "severity": 60, "action": "monitor" },
+    "tor": { "severity": 50, "action": "monitor" },
+    "vpn": { "severity": 30, "action": "allow" }
+  },
+  "notificationSettings": {
+    "enableRealTimeAlerts": true,
+    "criticalThreshold": 90,
+    "enableEmailAlerts": false,
+    "emailRecipients": []
+  },
+  "reportingSettings": {
+    "generateDailyReports": true,
+    "retentionDays": 30,
+    "enableTrendAnalysis": true
+  }
+}

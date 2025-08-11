@@ -51,7 +51,8 @@ async function getImagesByZpid(zpid) {
 
 
 async function fetchZillowPhotos(address1Line, zip) {
-  const fulladdress1 = `${address1Line}, Houston, TX ${zip}`;
+  // If zip is null, use the full address as is (already formatted)
+  const fulladdress1 = zip ? `${address1Line}, ${zip}` : address1Line;
   const normalizedKey = `zillow:photo:${fulladdress1.replace(/\s+/g, "").toLowerCase()}`;
 
   // 📊 Analytics keys

@@ -69,21 +69,77 @@ router.post("/", async (req, res) => {
         
         if (specificProperty) {
           console.log('✅ Found specific property via CoreLogic');
-          return res.status(200).json({
+          console.log('🔍 CoreLogic response structure:', Object.keys(specificProperty));
+          console.log('📍 SearchResult:', specificProperty.searchResult?.items?.[0]);
+          
+          // Extract property data from CoreLogic response
+          const property = specificProperty.searchResult?.items?.[0] || {};
+          const intelligence = specificProperty.intelligence?.data || {};
+          
+          // Get coordinates from the search result or site location
+          let latitude = null;
+          let longitude = null;
+          
+          // Try to get coordinates from multiple possible locations
+          if (property.latitude && property.longitude) {
+            latitude = parseFloat(property.latitude);
+            longitude = parseFloat(property.longitude);
+            console.log('📍 Using coordinates from search result:', { latitude, longitude });
+          } else if (intelligence.siteLocation?.coordinates) {
+            latitude = parseFloat(intelligence.siteLocation.coordinates.latitude);
+            longitude = parseFloat(intelligence.siteLocation.coordinates.longitude);
+            console.log('📍 Using coordinates from site location:', { latitude, longitude });
+          } else if (intelligence.propertyDetail?.site?.location) {
+            const loc = intelligence.propertyDetail.site.location;
+            latitude = parseFloat(loc.latitude);
+            longitude = parseFloat(loc.longitude);
+            console.log('📍 Using coordinates from property detail:', { latitude, longitude });
+          } else {
+            console.warn('⚠️ No coordinates found in CoreLogic response');
+          }
+          
+          // Try to fetch Zillow images for the property
+          let imgSrc = null;
+          let zpid = null;
+          
+          try {
+            console.log('🖼️ Attempting to fetch Zillow images for address search...');
+            const { fetchZillowPhotos } = require('../../../services/fetchZillow');
+            
+            // Use the parsed address components for better matching
+            const fullAddressForImage = `${street}, ${city}, ${stateZip}`;
+            console.log(`📍 Using full address for image search: ${fullAddressForImage}`);
+            
+            // Call fetchZillowPhotos with the full address
+            const zillowImages = await fetchZillowPhotos(fullAddressForImage, null);
+              
+            if (zillowImages && zillowImages.length > 0) {
+              imgSrc = zillowImages[0].imgSrc;
+              zpid = zillowImages[0].zpid;
+              console.log('✅ Successfully fetched Zillow image for address search');
+            } else {
+              console.log('⚠️ No Zillow images found for address search');
+            }
+          } catch (imageError) {
+            console.warn('⚠️ Failed to fetch Zillow images for address search:', imageError.message);
+          }
+          
+          const responseData = {
             fromCache: false,
             filters: { address: query },
             listings: [{
-              id: specificProperty.id || 'single_property',
+              id: property.clip || zpid || 'single_property',
               address: { oneLine: query },
-              price: specificProperty.valuation?.currentValue || specificProperty.price,
-              beds: specificProperty.structure?.bedrooms || specificProperty.beds,
-              baths: specificProperty.structure?.bathrooms || specificProperty.baths,
-              sqft: specificProperty.structure?.squareFeet || specificProperty.sqft,
+              price: intelligence.taxAssessments?.totalValue || intelligence.propertyDetail?.assessedValue || null,
+              beds: intelligence.buildings?.bedrooms || property.bedrooms || null,
+              baths: intelligence.buildings?.bathrooms || property.bathrooms || null,
+              sqft: intelligence.buildings?.squareFeet || property.squareFeet || null,
               location: {
-                latitude: specificProperty.location?.latitude,
-                longitude: specificProperty.location?.longitude
+                latitude: latitude,
+                longitude: longitude
               },
-              imgSrc: specificProperty.imgSrc || null,
+              imgSrc: imgSrc,
+              zpid: zpid,
               dataSource: 'corelogic',
               dataQuality: 'excellent'
             }],
@@ -94,35 +150,134 @@ router.post("/", async (req, res) => {
               timestamp: new Date().toISOString()
             },
             ai_summary: `Found the specific property at ${query}. This is a detailed view of this exact address.`
-          });
+          };
+          
+          console.log('🚀 FINAL RESPONSE DATA:');
+          console.log('📄 Full response:', JSON.stringify(responseData, null, 2));
+          console.log('🏠 Listing data:', JSON.stringify(responseData.listings[0], null, 2));
+          
+          return res.status(200).json(responseData);
         }
       } catch (error) {
         console.warn('⚠️ CoreLogic address search failed:', error.message);
-        // Fallback to mock data for now
-        return res.status(200).json({
-          fromCache: false,
-          filters: { address: query },
-          listings: [{
-            id: 'address_search_result',
-            address: { oneLine: query },
-            price: null,
-            beds: null,
-            baths: null,
-            sqft: null,
-            location: { latitude: null, longitude: null },
-            imgSrc: null,
-            dataSource: 'address_search',
-            dataQuality: 'partial',
-            note: 'Specific address data unavailable - property may not be listed or in our database'
-          }],
-          metadata: {
-            searchQuery: query,
-            searchType: 'address',
-            totalFound: 1,
-            timestamp: new Date().toISOString()
-          },
-          ai_summary: `This appears to be a search for the specific address: ${query}. However, detailed property information is not currently available in our database. This could mean the property is not currently for sale or not in our data sources.`
-        });
+        console.log('🔄 Falling back to Zillow for address search...');
+
+        try {
+          console.log('🔍 Zillow fallback: Trying multiple search strategies...');
+          
+          // Strategy 1: Search by full address
+          let zillowParams = new URLSearchParams({ location: cleanedQuery });
+          let zillowUrl = `https://zillow-com1.p.rapidapi.com/propertyExtendedSearch?${zillowParams.toString()}`;
+          console.log('🎆 Strategy 1 - Full address search:', zillowUrl);
+          
+          let zillowResponse = await fetch(zillowUrl, {
+            method: "GET",
+            headers: {
+              "x-rapidapi-key": process.env.RAPIDAPI_KEY,
+              "x-rapidapi-host": "zillow-com1.p.rapidapi.com",
+            },
+          });
+
+          if (!zillowResponse.ok) {
+            throw new Error(`Zillow API returned status ${zillowResponse.status}`);
+          }
+
+          let zillowData = await zillowResponse.json();
+          console.log('📊 Strategy 1 results:', { totalFound: zillowData.props?.length || 0 });
+          
+          // Strategy 2: If no results, try searching by city only to get nearby properties
+          if (!zillowData.props || zillowData.props.length === 0) {
+            console.log('🎆 Strategy 2 - City-based search for nearby properties...');
+            zillowParams = new URLSearchParams({ 
+              location: `${city}, ${stateZip}`,
+              status_type: "ForSale"
+            });
+            zillowUrl = `https://zillow-com1.p.rapidapi.com/propertyExtendedSearch?${zillowParams.toString()}`;
+            console.log('🎆 Strategy 2 URL:', zillowUrl);
+            
+            zillowResponse = await fetch(zillowUrl, {
+              method: "GET",
+              headers: {
+                "x-rapidapi-key": process.env.RAPIDAPI_KEY,
+                "x-rapidapi-host": "zillow-com1.p.rapidapi.com",
+              },
+            });
+            
+            if (zillowResponse.ok) {
+              zillowData = await zillowResponse.json();
+              console.log('📊 Strategy 2 results:', { totalFound: zillowData.props?.length || 0 });
+            }
+          }
+          
+          if (zillowData.props && zillowData.props.length > 0) {
+            console.log('✅ Found property via Zillow fallback');
+            console.log('📄 Raw Zillow property data:', JSON.stringify(zillowData.props[0], null, 2));
+            
+            const property = zillowData.props[0];
+
+            const listing = {
+              id: property.zpid || 'zillow_property',
+              address: { oneLine: property.address || query },
+              price: property.price || null,
+              beds: property.bedrooms || null,
+              baths: property.bathrooms || null,
+              sqft: property.livingArea || null,
+              location: {
+                latitude: property.latitude || null,
+                longitude: property.longitude || null
+              },
+              imgSrc: property.imgSrc || null,
+              zpid: property.zpid || null,
+              dataSource: 'zillow_fallback',
+              dataQuality: 'good'
+            };
+            
+            console.log('🚀 Final Zillow fallback listing:', JSON.stringify(listing, null, 2));
+
+            return res.status(200).json({
+              fromCache: false,
+              filters: { address: query },
+              listings: [listing],
+              metadata: {
+                searchQuery: query,
+                searchType: 'address',
+                totalFound: 1,
+                timestamp: new Date().toISOString()
+              },
+              ai_summary: `Found property information using Zillow as a fallback for ${query}.`
+            });
+          } else {
+            console.log('🚫 All Zillow search strategies failed');
+            throw new Error('No properties found on Zillow for this address.');
+          }
+        } catch (zillowError) {
+          console.warn('⚠️ Zillow fallback also failed:', zillowError.message);
+          // Fallback to mock data if both CoreLogic and Zillow fail
+          return res.status(200).json({
+            fromCache: false,
+            filters: { address: query },
+            listings: [{
+              id: 'address_search_result',
+              address: { oneLine: query },
+              price: null,
+              beds: null,
+              baths: null,
+              sqft: null,
+              location: { latitude: null, longitude: null },
+              imgSrc: null,
+              dataSource: 'address_search',
+              dataQuality: 'partial',
+              note: 'Specific address data unavailable - property may not be listed or in our database'
+            }],
+            metadata: {
+              searchQuery: query,
+              searchType: 'address',
+              totalFound: 1,
+              timestamp: new Date().toISOString()
+            },
+            ai_summary: `This appears to be a search for the specific address: ${query}. However, detailed property information is not currently available in our database. This could mean the property is not currently for sale or not in our data sources.`
+          });
+        }
       }
     }
   }

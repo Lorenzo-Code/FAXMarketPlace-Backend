@@ -1,0 +1,14 @@
+{
+  "date": "2025-08-10T02:44:15.850Z",
+  "statistics": {
+    "totalBlocked": 0,
+    "autoBlocked": 0,
+    "manualBlocked": 0,
+    "falsePositives": 0,
+    "reviewQueue": 0
+  },
+  "topBlockedCountries": [],
+  "topCategories": [],
+  "recentBlocks": [],
+  "recommendations": []
+}

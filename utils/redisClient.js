@@ -63,28 +63,44 @@ const ensureConnected = async () => {
 };
 
 const getAsync = async (key) => {
-  await ensureConnected();
-  const value = await client?.get(key);
-  if (!value) return null;
-  
   try {
-    return JSON.parse(value);
-  } catch (parseError) {
-    console.warn(`⚠️ Corrupted cache data for key "${key}", deleting:`, parseError.message);
-    // Delete the corrupted cache entry
-    await client?.del(key);
+    await ensureConnected();
+    if (!client || !connected) return null;
+    
+    const value = await client.get(key);
+    if (!value) return null;
+    
+    try {
+      return JSON.parse(value);
+    } catch (parseError) {
+      console.warn(`⚠️ Corrupted cache data for key "${key}", deleting:`, parseError.message);
+      // Delete the corrupted cache entry
+      try {
+        await client.del(key);
+      } catch (delError) {
+        console.warn('Failed to delete corrupted cache entry:', delError.message);
+      }
+      return null;
+    }
+  } catch (error) {
+    console.warn(`⚠️ Redis getAsync failed for key "${key}":`, error.message);
     return null;
   }
 };
 
 const setAsync = async (key, value, ttl = 86400) => {
-  await ensureConnected();
-  if (!client || value === undefined) return;
-  const shortTTL = key.includes("new-build") ? 3600 : ttl;
-  if (process.env.NODE_ENV === "development") {
-    console.log(`📝 Setting Redis key "${key}" with TTL = ${shortTTL}s`);
+  try {
+    await ensureConnected();
+    if (!client || !connected || value === undefined) return;
+    
+    const shortTTL = key.includes("new-build") ? 3600 : ttl;
+    if (process.env.NODE_ENV === "development") {
+      console.log(`📝 Setting Redis key "${key}" with TTL = ${shortTTL}s`);
+    }
+    await client.set(key, JSON.stringify(value), "EX", shortTTL);
+  } catch (error) {
+    console.warn(`⚠️ Redis setAsync failed for key "${key}":`, error.message);
   }
-  await client.set(key, JSON.stringify(value), "EX", shortTTL);
 };
 
 const incrementCounter = async (key) => {

@@ -21,6 +21,10 @@ const { trackUserSession } = require("./middleware/sessionTracking");
 const { initRateLimiters } = require("./middleware/rateLimiterRedis");
 const { ensureConnected } = require("./utils/redisClient");
 const realTimeAnalytics = require("./services/realTimeAnalytics");
+const websocketService = require('./services/websocketService');
+const ipBlockingService = require('./services/ipBlockingService');
+const ipGeolocation = require('./services/ipGeolocation');
+const threatIntelligence = require('./services/threatIntelligence');
 
 const app = express();
 const server = http.createServer(app);
@@ -42,7 +46,12 @@ const allowedOrigins = [
 ];
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Allow requests with no origin (null) for local file testing
+    // Allow requests from allowed origins
+    // Allow requests from localhost on any port for development
+    if (!origin || 
+        allowedOrigins.includes(origin) || 
+        (origin && origin.startsWith('http://localhost:'))) {
       callback(null, true);
     } else {
       console.error("❌ Blocked by CORS:", origin);
@@ -73,9 +82,25 @@ app.use(rateLimit({
   legacyHeaders: false,
 }));
 
-// ✅ Request Logger
+// ✅ Request Logger with IP Monitoring
 app.use((req, res, next) => {
-  console.log(`🌐 Incoming request: ${req.method} ${req.originalUrl}`);
+  const clientIP = req.headers['x-forwarded-for'] || 
+                   req.connection.remoteAddress || 
+                   req.socket.remoteAddress ||
+                   (req.connection.socket ? req.connection.socket.remoteAddress : null);
+  
+  console.log(`🌐 Incoming request: ${req.method} ${req.originalUrl} from IP: ${clientIP}`);
+  
+  // Record activity for IP monitoring
+  if (clientIP && clientIP !== '127.0.0.1' && clientIP !== '::1') {
+    ipBlockingService.recordActivity(clientIP, {
+      endpoint: req.originalUrl,
+      method: req.method,
+      userAgent: req.headers['user-agent'],
+      timestamp: new Date()
+    });
+  }
+  
   next();
 });
 
@@ -115,6 +140,9 @@ app.use("/api/auth", require('./routes/security')); // Security routes
 app.use("/api/security", require('./routes/security')); // Additional security endpoints
 app.use("/api", require('./routes/security')); // Health endpoint
 app.use("/api/admin", require('./routes/admin'));
+app.use("/api/admin/support-tickets", require('./routes/supportTickets')); // Support ticket management
+app.use("/api/webhooks", require('./routes/webhooks')); // Webhook handlers for integrations
+app.use("/api/kyc", require('./routes/kyc')); // KYC/Sumsub integration
 app.use("/api/blogs", require('./routes/api/blog'));
 app.use("/api/email", require('./routes/api/emailCollection'));
 app.use("/api/cache/stats", require('./routes/cacheStats'));
@@ -137,9 +165,13 @@ app.use("/api/ai/full-comp", require("./routes/api/ai/fullComp")); // POST /api/
 app.use("/api/ai/fast-comp", require('./routes/api/ai/fastComp')); // GET /api/ai/fast-comp - Lightweight property details
 app.use("/api/ai/smart-search", require('./routes/api/ai/smartSearch')); // GET /api/ai/smart-search - Smart AI search
 
-// ✅ WebSocket Configuration
+// ✅ WebSocket Configuration (now handled by websocketService)
+// Initialize WebSocket service with our server
+websocketService.initialize(server);
+
+// Keep the old io for backward compatibility
 io.on('connection', (socket) => {
-  console.log('🔌 New WebSocket connection:', socket.id);
+  console.log('🔌 Legacy WebSocket connection:', socket.id);
   
   // Join admin room for real-time updates
   socket.on('join-admin', () => {
@@ -148,7 +180,7 @@ io.on('connection', (socket) => {
   });
   
   socket.on('disconnect', () => {
-    console.log('🔌 WebSocket disconnected:', socket.id);
+    console.log('🔌 Legacy WebSocket disconnected:', socket.id);
   });
 });
 
@@ -181,6 +213,11 @@ app.use((req, res) => {
       // Start real-time analytics service
       realTimeAnalytics.start();
       console.log('📊 Real-time analytics service started');
+      
+      // IP monitoring services are already initialized
+      console.log('🛡️ IP monitoring services active');
+      console.log('🌍 IP geolocation service ready');
+      console.log('⚠️ Threat intelligence service ready');
     });
   } catch (err) {
     console.error("🛑 Startup error:", err);

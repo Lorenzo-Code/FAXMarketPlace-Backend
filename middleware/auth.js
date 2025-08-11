@@ -10,24 +10,34 @@ const verifyToken = async (req, res, next) => {
   }
 
   try {
-    // 📥 Check cache first for massive performance boost
-    const cacheKey = `user:session:${token.slice(-10)}`; // Use last 10 chars for key
-    const cachedUser = await getAsync(cacheKey);
-    
-    if (cachedUser) {
-      console.log('📥 Cache hit for user session');
-      req.user = JSON.parse(cachedUser);
-      return next();
+    // 📥 Try to check cache first (gracefully handle Redis failures)
+    let cachedUser = null;
+    try {
+      const cacheKey = `user:session:${token.slice(-10)}`; // Use last 10 chars for key
+      cachedUser = await getAsync(cacheKey);
+      
+      if (cachedUser) {
+        console.log('📥 Cache hit for user session');
+        req.user = typeof cachedUser === 'string' ? JSON.parse(cachedUser) : cachedUser;
+        return next();
+      }
+    } catch (cacheErr) {
+      console.warn('⚠️ Cache lookup failed, proceeding without cache:', cacheErr.message);
     }
 
-    // 🔍 Decode JWT if not cached
+    // 🔍 Decode JWT (fallback or no cache)
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("🔑 Token decoded:", decoded);
+    console.log("🔑 Token decoded:", decoded.email || decoded._id);
     req.user = decoded;
     
-    // 💾 Cache user session for 15 minutes (optimal security/performance balance)
-    await setAsync(cacheKey, JSON.stringify(decoded), 900);
-    console.log(`📝 Cached user session for: ${decoded._id || decoded.id}`);
+    // 💾 Try to cache user session (gracefully handle Redis failures)
+    try {
+      const cacheKey = `user:session:${token.slice(-10)}`;
+      await setAsync(cacheKey, JSON.stringify(decoded), 900);
+      console.log(`📝 Cached user session for: ${decoded.email || decoded._id}`);
+    } catch (cacheErr) {
+      console.warn('⚠️ Cache write failed, continuing without cache:', cacheErr.message);
+    }
     
     next();
   } catch (err) {
