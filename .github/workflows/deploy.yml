@@ -24,7 +24,13 @@ jobs:
           script: |
             cd /root/FAXMarketPlace-Backend
             git pull origin main
-            docker stop fax-api || true
-            docker rm fax-api || true
+            # Stop and remove any existing containers using port 8000
+            docker ps -q --filter "publish=8000" | xargs -r docker stop
+            docker ps -aq --filter "publish=8000" | xargs -r docker rm
+            # Also try to remove containers by name (in case they exist but not running)
+            docker rm -f fax-api || true
+            # Clean up old images to free space
+            docker image prune -f
+            # Build and run new container
             docker build -t fax-backend .
             docker run -d --env-file .env -p 8000:8000 --name fax-api fax-backend
