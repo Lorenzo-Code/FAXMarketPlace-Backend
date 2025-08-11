@@ -152,6 +152,13 @@ async function handleSlashCommand(req, res) {
         });
         break;
         
+      case '/ping':
+        res.json({
+          response_type: 'ephemeral',
+          text: 'pong'
+        });
+        break;
+        
       case '/admin-help':
         res.json({
           response_type: 'ephemeral',
