@@ -623,6 +623,13 @@ async function handleSlashCommand(req, res) {
 router.post('/commands', express.urlencoded({ extended: true }), verifySlackSignature, handleSlashCommand);
 
 /**
+ * @route   POST /slack/slash-commands (alternative route)
+ * @desc    Alternative route for Slack slash commands
+ * @access  Public (verified by signature)
+ */
+router.post('/slash-commands', express.urlencoded({ extended: true }), verifySlackSignature, handleSlashCommand);
+
+/**
  * @route   POST /slack/interactivity
  * @desc    Handle Slack interactive components and events
  * @access  Public (verified by signature)
@@ -715,9 +722,18 @@ router.get('/test', (req, res) => {
     timestamp: new Date().toISOString(),
     endpoints: {
       helpscout: '/api/webhooks/helpscout',
-      slackCommands: '/slack/commands',
-      slackInteractivity: '/slack/interactivity'
-    }
+      slackCommands: [
+        '/slack/commands',
+        '/slack/slash-commands',
+        '/api/webhooks/commands',
+        '/api/webhooks/slack-commands'
+      ],
+      slackInteractivity: [
+        '/slack/interactivity',
+        '/api/webhooks/interactivity'
+      ]
+    },
+    note: 'Use any of the slash command URLs above in your Slack app configuration'
   });
 });
 
