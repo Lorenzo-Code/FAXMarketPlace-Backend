@@ -37,7 +37,7 @@
     "md5": "^2.2.1",
     "mersenne-twister": "^1.1.0",
     "mongodb": "^6.17.0",
-    "mongoose": "^8.16.3",
+    "mongoose": "^8.17.1",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
     "node-2fa": "^2.0.3",
