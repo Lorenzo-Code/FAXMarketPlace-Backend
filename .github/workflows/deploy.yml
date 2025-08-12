@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: SSH into Droplet and Deploy
         uses: appleboy/ssh-action@v1.0.3
