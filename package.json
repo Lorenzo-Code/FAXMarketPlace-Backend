@@ -57,9 +57,9 @@
     "xss-clean": "^0.1.4"
   },
   "devDependencies": {
-    "@types/node": "^24.0.1",
+    "@types/node": "^24.2.1",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.2"
   }
 }
