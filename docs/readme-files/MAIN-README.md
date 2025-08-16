@@ -1,70 +1,170 @@
-## Tests
+# FractionaX Backend - Core Documentation
 
-Your project includes several tests organized as follows:
+## Project Overview
 
-- **CoreLogic Tests**: Located in `tests/corelogic/`, these test the CoreLogic utilities and integration.
-- **AI Tests**: Located in `tests/ai/`, these include tests for AI search functionalities.
-- **Examples**: Found in `tests/examples/`, showcasing implementations and demos.
+FractionaX Backend is a comprehensive real estate investment platform that provides:
 
-To run your tests, navigate to the appropriate directory and execute the test files using Node.js or PowerShell depending on the file type.
+- **Real Estate Data API** - Property search, analysis, and valuation
+- **User Management** - Authentication, KYC, and subscription management
+- **Wallet System** - FXCT token management with custodial wallets
+- **Admin Tools** - Comprehensive Slack-based administration
+- **AI-Powered Analytics** - Property analysis and market insights
+
+## Architecture
+
+### Core Components
+
+1. **API Layer** (`routes/`)
+   - RESTful API endpoints for all platform functionality
+   - Authentication and authorization middleware
+   - Rate limiting and security controls
+
+2. **Business Logic** (`services/`)
+   - Core business logic separated from routing
+   - External API integrations (CoreLogic, Zillow, etc.)
+   - AI and analytics services
+
+3. **Data Layer** (`models/`)
+   - MongoDB schemas with Mongoose
+   - User, property, transaction, and audit models
+   - Caching layer with Redis integration
+
+4. **Admin Layer** (`Slack Integration`)
+   - 100+ admin commands via Slack bot
+   - Real-time monitoring and alerts
+   - User management and support tools
+
+## Key Features
+
+### 🏠 Real Estate API
+- Property search and discovery
+- Detailed property analytics
+- Market comparables and valuations
+- Climate risk and neighborhood data
+
+### 💰 Wallet System
+- Custodial FXCT token wallets
+- Automatic token issuance for subscriptions
+- Usage-based deductions for API calls
+- Secure withdrawal system
+
+### 🛡️ Admin Tools
+- Slack-based administration
+- User account management
+- System monitoring and alerts
+- Compliance and audit tools
+
+### 🔍 AI Analytics
+- Property analysis and scoring
+- Market trend insights
+- Investment recommendations
+- Automated report generation
 
 ## Getting Started
 
-We provide a sample app using Node.js that you can deploy on App Platform. These steps will get this sample application running for you using App Platform.
+### Prerequisites
+- Node.js 16+
+- MongoDB
+- Redis
+- External API keys (CoreLogic, OpenAI, etc.)
 
-**Note: Following these steps may result in charges for the use of DigitalOcean services.**
+### Installation
+```bash
+# Clone and install
+git clone <repository>
+npm install
 
-### Requirements
+# Configure environment
+cp .env.example .env
+# Edit .env with your configuration
 
-* You need a DigitalOcean account. If you don't already have one, you can sign up at https://cloud.digitalocean.com/registrations/new.
+# Start development
+npm run dev
+```
 
-## Deploying the App
+### Environment Configuration
+See the main README.md for complete environment variable setup.
 
-Click this button to deploy the app to the DigitalOcean App Platform. If you are not logged in, you will be prompted to log in with your DigitalOcean account.
+## Development
 
-[![Deploy to DigitalOcean](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/digitalocean/sample-nodejs/tree/main)
+### Project Structure
+```
+FractionaX-Backend/
+├── config/           # Configuration files
+├── controllers/      # Route controllers
+├── middleware/       # Express middleware
+├── models/          # Database models
+├── routes/          # API routes
+├── services/        # Business logic
+├── tests/           # Test suites
+├── utils/           # Helper utilities
+└── scripts/         # Utility scripts
+```
 
-Using this button disables the ability to automatically re-deploy your app when pushing to a branch or tag in your repository as you are using this repo directly.
+### Key Services
+- **walletService** - Wallet and token management
+- **realTimeAnalytics** - Usage and performance tracking
+- **slackService** - Admin bot integration
+- **openaiService** - AI-powered analysis
 
-If you want to automatically re-deploy your app, [fork](https://docs.github.com/en/github/getting-started-with-github/fork-a-repo) the GitHub repository to your account so that you have a copy of it stored to the cloud. Click the **Fork** button in the GitHub repository and follow the on-screen instructions.
+## Testing
 
-After forking the repo, you should now be viewing this README in your own GitHub org (e.g. `https://github.com/<your-org>/sample-nodejs`). To deploy the new repo, visit https://cloud.digitalocean.com/apps and click **Create App**. Then, click **GitHub**, select the repository you created and select the `main` branch. App Platform will inspect the code, automatically detect the kind of component to create, and use the correct buildpack to create and deploy a container.
+### Test Structure
+- **API Tests** - Endpoint functionality
+- **CoreLogic Tests** - External API integration
+- **AI Tests** - Analytics and scoring
+- **Performance Tests** - Caching and optimization
 
-After clicking the **Deploy to DigitalOcean** button or completing the instructions above to fork the repo, follow these steps:
+### Running Tests
+```bash
+# Run all tests
+npm test
 
-1. Configure the app such as specifying HTTP routes, environment variables or adding a database.
-1. Provide a name for your app and select which region you want to deploy your app to and click **Next**. The closest region to you should be selected by default. All App Platform apps are routed through a global CDN. So this will not affect your app performance, unless it needs to talk to external services.
-1. On the following screen, leave all the fields as they are and click **Next**.
-1. Confirm your **Plan** settings and how many containers you want to launch and click **Launch Basic/Pro App**.
-1. You should see a "Building..." progress indicator. You can click **View Logs** to see more details of the build.
-1. It can take a few minutes for the build to finish, but you can follow the progress in the **Deployments** tab.
-1. Once the build completes successfully, click the **Live App** link in the header and you should see your running application in a new tab, displaying the home page.
+# Run specific test suites
+node tests/corelogic/test_corelogic_integration.js
+node tests/ai/test_ai_search_dealfinder.js
+```
 
-### Making Changes to Your App
+## Deployment
 
-If you followed the steps to fork the repo and used your own copy when deploying the app, you can push changes to your fork and see App Platform automatically re-deploy the update to your app. During these automatic deployments, your application will never pause or stop serving request because App Platform offers zero-downtime deployments.
+### Production Setup
+1. Configure production environment variables
+2. Set up MongoDB and Redis instances
+3. Configure external API access
+4. Deploy with proper security settings
 
-Here's an example code change you can make for this app:
+### Docker Support
+```bash
+# Build and run
+docker build -t fractionax-backend .
+docker run -p 5000:5000 fractionax-backend
+```
 
-1. Edit code within the repository
-1. Commit the change to the `main` branch. Normally it's a better practice to create a new branch for your change and then merge that branch to `main` after review, but for this demo you can commit to the `main` branch directly.
-1. Visit https://cloud.digitalocean.com/apps and navigate to your sample app.
-1. You should see a "Building..." progress indicator, just like when you first created the app.
-1. Once the build completes successfully, click the **Live App** link in the header and you should see your updated application running. You may need to force refresh the page in your browser (e.g. using **Shift+Reload**).
+## Documentation Links
 
-### Learn More
+- **[API Documentation](../API_ROUTES_COST_OPTIMIZED.md)** - Complete API reference
+- **[Wallet System](../../WALLET_SYSTEM_README.md)** - Token and wallet management
+- **[Slack Admin Bot](../../SLACK_SUPER_ADMIN_BOT.md)** - Admin tools and commands
+- **[Caching Strategy](../CACHING_IMPLEMENTATION_SUMMARY.md)** - Performance optimization
+- **[CoreLogic Integration](../CORELOGIC_IMPLEMENTATION_SUMMARY.md)** - External API setup
 
-You can learn more about the App Platform and how to manage and update your application at https://www.digitalocean.com/docs/app-platform/.
+## Security
 
-## Documentation
+- JWT-based authentication
+- Role-based access control
+- API rate limiting
+- Input validation and sanitization
+- Secure webhook handling
 
-Explore the full documentation [here](./docs/README.md) for detailed insights into caching, CoreLogic integration, and more.
+## Monitoring
 
-## Deleting the App
+- Health check endpoints
+- Real-time performance metrics
+- Error logging and alerting
+- Admin dashboard via Slack
 
-When you no longer need this sample application running live, you can delete it by following these steps:
-1. Visit the Apps control panel at https://cloud.digitalocean.com/apps.
-2. Navigate to the sample app.
-3. In the **Settings** tab, click **Destroy**.
+## Support
 
-**Note: If you do not delete your app, charges for using DigitalOcean services will continue to accrue.**
+- Use Slack admin commands for operational support
+- Check documentation for implementation details
+- Create GitHub issues for bugs and feature requests

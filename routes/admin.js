@@ -13,6 +13,11 @@ const ipGeolocation = require('../services/ipGeolocation');
 const threatIntelligence = require('../services/threatIntelligence');
 const websocketService = require('../services/websocketService');
 
+// Import workflow and integration services
+const dailyWorkflowService = require('../services/dailyWorkflowService');
+const helpScoutService = require('../services/helpScoutService');
+const slackService = require('../services/slackService');
+
 // Helper function to generate secure temporary passwords
 function generateTempPassword() {
   const length = 12;
@@ -11904,5 +11909,417 @@ const aiSecurityRoutes = require('./ai/security');
 
 // Mount AI security routes under /security/ai
 router.use('/security/ai', aiSecurityRoutes);
+
+// ✅ Admin To-Do Section & Real-time Support
+
+/**
+ * @route   GET /api/admin/todos
+ * @desc    Get all admin to-do items (pending KYCs, support tickets, etc.)
+ * @access  Admin
+ */
+router.get("/todos", verifyToken, authorizeAdmin, async (req, res) => {
+  try {
+    // Fetch all pending tasks for the to-do list
+    const todos = await dailyWorkflowService.getAdminTodos();
+    
+    res.json({ 
+      success: true,
+      todos 
+    });
+
+  } catch (error) {
+    console.error("❌ Get admin todos error:", error);
+    res.status(500).json({ msg: "Failed to fetch admin to-do list", error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/admin/support
+ * @desc    Get all support tickets with filtering
+ * @access  Admin
+ */
+router.get("/support", verifyToken, authorizeAdmin, async (req, res) => {
+  try {
+    // For now, return mock data until we implement the SupportTicket model
+    const mockTickets = [
+      {
+        id: 'ST-001',
+        subject: 'Login Issues',
+        description: 'User cannot login to their account',
+        customerEmail: 'user@example.com',
+        status: 'open',
+        priority: 'high',
+        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+        slackThreadId: 'T123456789'
+      },
+      {
+        id: 'ST-002',
+        subject: 'Property Upload Problem',
+        description: 'Cannot upload property documentation',
+        customerEmail: 'investor@example.com',
+        status: 'in_progress',
+        priority: 'medium',
+        createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
+        slackThreadId: 'T987654321'
+      },
+      {
+        id: 'ST-003',
+        subject: 'KYC Verification Delay',
+        description: 'KYC verification taking too long',
+        customerEmail: 'customer@example.com',
+        status: 'resolved',
+        priority: 'low',
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+        slackThreadId: 'T456789123'
+      }
+    ];
+
+    // Apply filters if provided
+    let filteredTickets = mockTickets;
+    const { status, priority, search } = req.query;
+
+    if (status && status !== 'all') {
+      filteredTickets = filteredTickets.filter(ticket => ticket.status === status);
+    }
+
+    if (priority && priority !== 'all') {
+      filteredTickets = filteredTickets.filter(ticket => ticket.priority === priority);
+    }
+
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filteredTickets = filteredTickets.filter(ticket => 
+        ticket.subject.toLowerCase().includes(searchLower) ||
+        ticket.description.toLowerCase().includes(searchLower) ||
+        ticket.customerEmail.toLowerCase().includes(searchLower)
+      );
+    }
+
+    res.json({ 
+      success: true,
+      tickets: filteredTickets,
+      totalCount: filteredTickets.length
+    });
+
+  } catch (error) {
+    console.error("❌ Get support tickets error:", error);
+    res.status(500).json({ msg: "Failed to fetch support tickets", error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/admin/support/statistics
+ * @desc    Get support ticket statistics and metrics
+ * @access  Admin
+ */
+router.get("/support/statistics", verifyToken, authorizeAdmin, async (req, res) => {
+  try {
+    const { timeRange = '30d' } = req.query;
+    
+    // Mock statistics data - replace with real data queries
+    const statistics = {
+      timeRange,
+      generatedAt: new Date(),
+      
+      overview: {
+        totalTickets: 156,
+        openTickets: 23,
+        inProgressTickets: 8,
+        resolvedTickets: 125,
+        averageResolutionTime: '4.2 hours',
+        customerSatisfactionScore: 4.6
+      },
+      
+      byStatus: {
+        open: 23,
+        in_progress: 8,
+        resolved: 125,
+        closed: 0
+      },
+      
+      byPriority: {
+        low: 67,
+        medium: 58,
+        high: 24,
+        critical: 7
+      },
+      
+      trends: {
+        ticketsCreated: [
+          { date: '2024-01-01', count: 12 },
+          { date: '2024-01-02', count: 8 },
+          { date: '2024-01-03', count: 15 },
+          { date: '2024-01-04', count: 10 },
+          { date: '2024-01-05', count: 18 }
+        ],
+        resolutionTimes: [
+          { date: '2024-01-01', avgHours: 3.2 },
+          { date: '2024-01-02', avgHours: 4.8 },
+          { date: '2024-01-03', avgHours: 2.9 },
+          { date: '2024-01-04', avgHours: 5.1 },
+          { date: '2024-01-05', avgHours: 3.7 }
+        ]
+      },
+      
+      topIssues: [
+        { category: 'Login Issues', count: 45, percentage: 28.8 },
+        { category: 'Property Upload', count: 32, percentage: 20.5 },
+        { category: 'KYC Verification', count: 28, percentage: 17.9 },
+        { category: 'Payment Problems', count: 22, percentage: 14.1 },
+        { category: 'Other', count: 29, percentage: 18.7 }
+      ],
+      
+      agentPerformance: [
+        { agent: 'Admin User 1', resolved: 42, avgTime: '3.5 hours', satisfaction: 4.8 },
+        { agent: 'Admin User 2', resolved: 38, avgTime: '4.1 hours', satisfaction: 4.6 },
+        { agent: 'System', resolved: 45, avgTime: '2.2 hours', satisfaction: 4.3 }
+      ]
+    };
+    
+    res.json({ 
+      success: true,
+      statistics
+    });
+
+  } catch (error) {
+    console.error("❌ Get support statistics error:", error);
+    res.status(500).json({ msg: "Failed to fetch support statistics", error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/admin/support/:ticketId
+ * @desc    Get specific support ticket details
+ * @access  Admin
+ */
+router.get("/support/:ticketId", verifyToken, authorizeAdmin, async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    
+    // For now, return mock data
+    const mockTicket = {
+      id: ticketId,
+      subject: 'Sample Ticket',
+      description: 'This is a sample ticket for testing',
+      customerEmail: 'user@example.com',
+      status: 'open',
+      priority: 'medium',
+      createdAt: new Date(),
+      slackThreadId: 'T123456789',
+      comments: [
+        {
+          id: 1,
+          text: 'Initial ticket description',
+          author: 'user@example.com',
+          isCustomer: true,
+          createdAt: new Date(Date.now() - 60 * 60 * 1000)
+        }
+      ]
+    };
+
+    res.json({ 
+      success: true,
+      ticket: mockTicket
+    });
+
+  } catch (error) {
+    console.error("❌ Get support ticket error:", error);
+    res.status(500).json({ msg: "Failed to fetch support ticket", error: error.message });
+  }
+});
+
+/**
+ * @route   POST /api/admin/support/create
+ * @desc    Create a new support ticket from the admin panel
+ * @access  Admin
+ */
+router.post("/support/create", verifyToken, authorizeAdmin, async (req, res) => {
+  try {
+    const { customerEmail, subject, description } = req.body;
+    const adminUser = req.user.email;
+
+    if (!customerEmail || !subject || !description) {
+      return res.status(400).json({ msg: "Missing required fields" });
+    }
+
+    // Create ticket and Slack thread
+    const result = await dailyWorkflowService.createSupportTicketWorkflow({
+      customerEmail,
+      subject,
+      description,
+      source: 'internal'
+    });
+
+    if (result.success) {
+      // Notify admin panel in real-time
+      if (websocketService.io) {
+        websocketService.io.emit('admin-todos', {
+          type: 'new_ticket',
+          ticket: result.ticket
+        });
+      }
+
+      res.status(201).json({ 
+        success: true, 
+        message: "Support ticket created successfully and posted to Slack!",
+        ticket: result.ticket,
+        slackThreadId: result.slackThreadId
+      });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to create support ticket", 
+        error: result.error 
+      });
+    }
+
+  } catch (error) {
+    console.error("❌ Create support ticket error:", error);
+    res.status(500).json({ msg: "Failed to create support ticket", error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/admin/users/search
+ * @desc    Search users by email for autocomplete (smart email input)
+ * @access  Admin
+ */
+router.get("/users/search", verifyToken, authorizeAdmin, async (req, res) => {
+  try {
+    const { q, limit = 10 } = req.query;
+    
+    if (!q || q.length < 2) {
+      return res.json({ success: true, users: [] });
+    }
+    
+    // Search users by email, firstName, or lastName
+    const searchRegex = new RegExp(q, 'i'); // Case-insensitive search
+    
+    const users = await User.find({
+      $or: [
+        { email: searchRegex },
+        { firstName: searchRegex },
+        { lastName: searchRegex }
+      ]
+    })
+    .select('_id email firstName lastName role emailVerified createdAt')
+    .limit(parseInt(limit))
+    .sort({ email: 1 })
+    .lean();
+    
+    // Format users for autocomplete display
+    const formattedUsers = users.map(user => ({
+      id: user._id,
+      email: user.email,
+      name: `${user.firstName} ${user.lastName}`.trim(),
+      role: user.role,
+      emailVerified: user.emailVerified,
+      displayText: `${user.email} - ${user.firstName} ${user.lastName} (${user.role})`,
+      value: user.email // This will be the value used in the input
+    }));
+    
+    res.json({
+      success: true,
+      users: formattedUsers,
+      count: formattedUsers.length,
+      query: q
+    });
+    
+  } catch (error) {
+    console.error("❌ User search error:", error);
+    res.status(500).json({
+      success: false,
+      msg: "Failed to search users",
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route   GET /api/admin/status
+ * @desc    Get simple system and integration status for frontend
+ * @access  Admin
+ */
+router.get("/status", verifyToken, authorizeAdmin, async (req, res) => {
+  try {
+    // Import the services at the top level if not already imported
+    const helpScoutService = require('../services/helpScoutService');
+    const slackService = require('../services/slackService');
+    
+    // Get integration status
+    const helpScoutStatus = await helpScoutService.getStatus();
+    const slackStatus = await slackService.getStatus();
+    
+    const status = {
+      timestamp: new Date(),
+      system: {
+        status: 'operational',
+        uptime: process.uptime(),
+        memory: {
+          used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+          total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
+        }
+      },
+      integrations: {
+        helpScout: {
+          connected: helpScoutStatus.connected || false,
+          lastSync: helpScoutStatus.lastSync || null,
+          mailboxes: helpScoutStatus.mailboxes || 0
+        },
+        slack: {
+          connected: slackStatus.connected || false,
+          lastSync: slackStatus.lastSync || null,
+          botId: slackStatus.botId || null
+        }
+      },
+      database: {
+        connected: require('mongoose').connection.readyState === 1
+      }
+    };
+    
+    res.json({
+      success: true,
+      status
+    });
+    
+  } catch (error) {
+    console.error("❌ Get status error:", error);
+    res.status(500).json({ 
+      success: false,
+      msg: "Failed to fetch system status", 
+      error: error.message 
+    });
+  }
+});
+
+/**
+ * @route   POST /api/admin/support/reply/:ticketId
+ * @desc    Reply to a support ticket from the admin panel
+ * @access  Admin
+ */
+router.post("/support/reply/:ticketId", verifyToken, authorizeAdmin, async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    const { reply } = req.body;
+    const adminUser = req.user.email;
+
+    const result = await dailyWorkflowService.handleTicketReply({
+      ticketId,
+      reply,
+      author: adminUser,
+      isCustomer: false
+    });
+
+    if (result.success) {
+      res.json({ success: true, message: "Reply sent successfully and synced to Slack" });
+    } else {
+      res.status(500).json({ success: false, message: "Failed to send reply", error: result.error });
+    }
+
+  } catch (error) {
+    console.error("❌ Reply to support ticket error:", error);
+    res.status(500).json({ msg: "Failed to send reply", error: error.message });
+  }
+});
 
 module.exports = router;

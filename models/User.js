@@ -137,6 +137,62 @@ const UserSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // 💳 Subscription Information
+    subscription: {
+      plan: {
+        type: String,
+        enum: ['free', 'premium', 'pro'],
+        default: 'free'
+      },
+      status: {
+        type: String,
+        enum: ['active', 'inactive', 'cancelled', 'past_due', 'trialing'],
+        default: 'inactive'
+      },
+      startDate: {
+        type: Date,
+        default: null
+      },
+      endDate: {
+        type: Date,
+        default: null
+      },
+      // Stripe/payment integration fields
+      stripeCustomerId: {
+        type: String,
+        default: null
+      },
+      stripeSubscriptionId: {
+        type: String,
+        default: null
+      },
+      // Usage tracking
+      usage: {
+        searchesThisMonth: {
+          type: Number,
+          default: 0
+        },
+        lastResetDate: {
+          type: Date,
+          default: Date.now
+        }
+      },
+      // Trial information
+      trial: {
+        hasUsedTrial: {
+          type: Boolean,
+          default: false
+        },
+        trialStartDate: {
+          type: Date,
+          default: null
+        },
+        trialEndDate: {
+          type: Date,
+          default: null
+        }
+      }
+    },
     createdAt: {
       type: Date,
       default: Date.now,

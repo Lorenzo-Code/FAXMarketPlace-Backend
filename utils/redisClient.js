@@ -65,7 +65,10 @@ const ensureConnected = async () => {
 const getAsync = async (key) => {
   try {
     await ensureConnected();
-    if (!client || !connected) return null;
+    if (!client || !connected) {
+      console.warn(`⚠️ Redis not connected, getAsync failed for key: ${key}`);
+      return null;
+    }
     
     const value = await client.get(key);
     if (!value) return null;
@@ -77,13 +80,19 @@ const getAsync = async (key) => {
       // Delete the corrupted cache entry
       try {
         await client.del(key);
+        console.log(`🗑️ Successfully deleted corrupted cache entry: ${key}`);
       } catch (delError) {
-        console.warn('Failed to delete corrupted cache entry:', delError.message);
+        console.warn(`⚠️ Failed to delete corrupted cache entry "${key}":`, delError.message);
       }
       return null;
     }
   } catch (error) {
     console.warn(`⚠️ Redis getAsync failed for key "${key}":`, error.message);
+    // Check if connection was lost and mark as disconnected
+    if (error.message.includes('ECONNREFUSED') || error.message.includes('Connection is closed')) {
+      connected = false;
+      console.warn('🔄 Redis connection lost, marking as disconnected for reconnection attempt');
+    }
     return null;
   }
 };
@@ -91,15 +100,31 @@ const getAsync = async (key) => {
 const setAsync = async (key, value, ttl = 86400) => {
   try {
     await ensureConnected();
-    if (!client || !connected || value === undefined) return;
+    if (!client || !connected || value === undefined) {
+      console.warn(`⚠️ Redis not connected or value undefined, setAsync failed for key: ${key}`);
+      return false;
+    }
     
     const shortTTL = key.includes("new-build") ? 3600 : ttl;
     if (process.env.NODE_ENV === "development") {
       console.log(`📝 Setting Redis key "${key}" with TTL = ${shortTTL}s`);
     }
-    await client.set(key, JSON.stringify(value), "EX", shortTTL);
+    
+    const result = await client.set(key, JSON.stringify(value), "EX", shortTTL);
+    
+    if (process.env.NODE_ENV === "development" && result === 'OK') {
+      console.log(`✅ Successfully set Redis key: ${key}`);
+    }
+    
+    return result === 'OK';
   } catch (error) {
     console.warn(`⚠️ Redis setAsync failed for key "${key}":`, error.message);
+    // Check if connection was lost and mark as disconnected
+    if (error.message.includes('ECONNREFUSED') || error.message.includes('Connection is closed')) {
+      connected = false;
+      console.warn('🔄 Redis connection lost during setAsync, marking as disconnected');
+    }
+    return false;
   }
 };
 

@@ -20,11 +20,12 @@ const { verifyToken } = require("./middleware/auth");
 const { trackUserSession } = require("./middleware/sessionTracking");
 const { initRateLimiters } = require("./middleware/rateLimiterRedis");
 const { ensureConnected } = require("./utils/redisClient");
-const realTimeAnalytics = require("./services/realTimeAnalytics");
+const realTimeAnalytics = require('./services/realTimeAnalytics');
 const websocketService = require('./services/websocketService');
 const ipBlockingService = require('./services/ipBlockingService');
 const ipGeolocation = require('./services/ipGeolocation');
 const threatIntelligence = require('./services/threatIntelligence');
+const scheduledTaskService = require('./services/scheduledTaskService');
 
 const app = express();
 const server = http.createServer(app);
@@ -104,9 +105,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// ✅ MongoDB Connection
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("📦 Connected to MongoDB"))
+// ✅ MongoDB Connection with robust timeout settings
+mongoose.connect(process.env.MONGO_URI, {
+  serverSelectionTimeoutMS: 10000, // 10 seconds
+  connectTimeoutMS: 10000,
+  socketTimeoutMS: 45000, // 45 seconds for long operations
+  maxPoolSize: 10,
+  retryWrites: true
+})
+  .then(() => console.log("📦 Connected to MongoDB with enhanced settings"))
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
 // ✅ Sessions
@@ -146,13 +153,17 @@ app.use("/api/kyc", require('./routes/kyc')); // KYC/Sumsub integration
 app.use("/api/blogs", require('./routes/api/blog'));
 app.use("/api/email", require('./routes/api/emailCollection'));
 app.use("/api/cache/stats", require('./routes/cacheStats'));
+app.use("/api/cache/search", require('./routes/api/cache/searchStats')); // MongoDB search cache statistics
+app.use("/api/cache/global", require('./routes/api/cache/globalStats')); // Global cache management and statistics
 app.use("/api/schools", require('./routes/schoolInfo'));
 app.use("/api/attom-data", require('./routes/attomData'));
 app.use("/api/token-prices", require('./routes/tokenPrices'));
 app.use("/api/uploads", require('./routes/api/uploads'));
 app.use("/api/properties", require('./routes/api/properties'));
+app.use("/api/corelogic", require('./routes/api/corelogic')); // CoreLogic property insights
 // app.use("/api/test", require('./routes/api/testRedis')); // Commented out - file moved to scripts
 app.use("/api/suggested", require("./routes/api/suggestedRoutes"));
+app.use("/api/marketplace/listings", require("./routes/api/marketplaceListings")); // Real Zillow listings for marketplace
 app.use("/api/google-maps", require('./routes/api/googleMapsTest')); // Google Maps testing and autocomplete
 
 // ✅ Slack Routes - Direct routes without /api prefix for Slack webhook URLs
@@ -160,8 +171,12 @@ app.use("/slack", require('./routes/webhooks')); // Slack slash commands and int
 
 // ✅ AI Routes
 const searchRouter = require('./routes/api/ai/search');
+const searchRouterV2 = require('./routes/api/ai/search_v2');
+const marketplaceRouter = require('./routes/api/ai/marketplace');
 const pipelineRouter = require('./routes/api/ai/pipeline');
-app.use("/api/ai/search", searchRouter);                         // POST /api/ai/search - Main AI search endpoint
+app.use("/api/ai/search", searchRouter);                         // POST /api/ai/search - Legacy search endpoint
+app.use("/api/ai/search/v2", searchRouterV2);                   // POST /api/ai/search/v2 - New future-ready search architecture
+app.use("/api/ai/marketplace", marketplaceRouter);               // POST /api/ai/marketplace - AI-powered marketplace listings
 app.use("/api/ai", pipelineRouter);                              // POST /api/ai/pipeline + POST /api/ai/reset
 app.use("/api/ai/full-comp", require("./routes/api/ai/fullComp")); // POST /api/ai/full-comp - Full property report
 app.use("/api/ai/fast-comp", require('./routes/api/ai/fastComp')); // GET /api/ai/fast-comp - Lightweight property details
@@ -220,6 +235,10 @@ app.use((req, res) => {
       console.log('🛡️ IP monitoring services active');
       console.log('🌍 IP geolocation service ready');
       console.log('⚠️ Threat intelligence service ready');
+      
+      // Start scheduled task service
+      scheduledTaskService.start();
+      console.log('📅 Scheduled task service started');
     });
   } catch (err) {
     console.error("🛑 Startup error:", err);

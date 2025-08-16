@@ -4,15 +4,26 @@ const OpenAI = require("openai");
 const fetch = require("node-fetch");
 require("dotenv").config();
 
+// Import freemium rate limiting and data limiting
+const { freemiumRateLimit, addLimitsToResponse } = require("../../../middleware/freemiumRateLimit");
+const { applyTierLimitsMiddleware } = require("../../../utils/freemiumDataLimiter");
+
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const { getPropertyDetail, getAttomId, fetchMultipleProperties } = require("../../../services/attom");
 const { getAsync, setAsync, getUserKey } = require("../../../utils/redisClient");
+const SearchCache = require("../../../models/SearchCache");
+// Import optimization services
+const { PropertyBatchProcessor } = require("../../../services/propertyBatchProcessor");
+const enhancedCache = require("../../../services/enhancedCacheService");
+const { DataSourceRouter } = require("../../../services/dataSourceRouter");
+const { performance } = require('perf_hooks');
 
 
 // 🤖 POST AI Search - Main endpoint as per data map
 // This endpoint uses OpenAI to understand a user's search prompt and return structured real estate search data.
 // It pulls CoreLogic property data and Zillow photos to enrich the results.
-router.post("/", async (req, res) => {
+// Apply freemium rate limiting and data limiting
+router.post("/", freemiumRateLimit, addLimitsToResponse, applyTierLimitsMiddleware, async (req, res) => {
   const { query } = req.body;
   if (!query || typeof query !== "string") {
     return res.status(400).json({ error: "Missing or invalid query" });
@@ -101,6 +112,7 @@ router.post("/", async (req, res) => {
           // Try to fetch Zillow images for the property
           let imgSrc = null;
           let zpid = null;
+          let carouselPhotos = [];
           
           try {
             console.log('🖼️ Attempting to fetch Zillow images for address search...');
@@ -114,9 +126,10 @@ router.post("/", async (req, res) => {
             const zillowImages = await fetchZillowPhotos(fullAddressForImage, null);
               
             if (zillowImages && zillowImages.length > 0) {
-              imgSrc = zillowImages[0].imgSrc;
+              imgSrc = zillowImages[0].imgSrc; // Primary image for backward compatibility
               zpid = zillowImages[0].zpid;
-              console.log('✅ Successfully fetched Zillow image for address search');
+              carouselPhotos = zillowImages.map(img => img.imgSrc); // All images for carousel
+              console.log(`✅ Successfully fetched ${zillowImages.length} Zillow images for address search`);
             } else {
               console.log('⚠️ No Zillow images found for address search');
             }
@@ -139,9 +152,11 @@ router.post("/", async (req, res) => {
                 longitude: longitude
               },
               imgSrc: imgSrc,
+              carouselPhotos: carouselPhotos,
               zpid: zpid,
               dataSource: 'corelogic',
-              dataQuality: 'excellent'
+              dataQuality: 'excellent',
+              photoCount: carouselPhotos.length
             }],
             metadata: {
               searchQuery: query,
@@ -282,6 +297,27 @@ router.post("/", async (req, res) => {
     }
   }
 
+  // 💰 PHASE 1: Check MongoDB cache first to save costs
+  console.log('💰 Phase 1: Checking MongoDB cache to save API costs...');
+  
+  // Extract search parameters for cache lookup
+  let searchFilters = { limit: req.body.limit || 10 };
+  
+  // Try to get cached results first
+  const cachedResults = await SearchCache.findCachedResults(query, searchFilters);
+  if (cachedResults) {
+    console.log('🎉 Serving cached results - no API costs incurred!');
+    return res.status(200).json({ 
+      fromCache: true, 
+      ...cachedResults,
+      metadata: {
+        ...cachedResults.metadata,
+        servedFromCache: true,
+        cacheTimestamp: new Date().toISOString()
+      }
+    });
+  }
+
   // 🔍 Ask GPT to extract structured filters (for non-address searches)
   let parsedFilter = {};
   try {
@@ -293,7 +329,8 @@ router.post("/", async (req, res) => {
           role: "system",
           content:
             "You are a smart real estate assistant. Extract search criteria and return ONLY valid JSON. For bedroom requests:\n" +
-            "- '3 bedroom' or '3 bed' = {\"exact_beds\": 3}\n" +
+            "- '3 bedroom' or '3 bed' = {\"min_beds\": 3} (3 or more bedrooms)\n" +
+            "- 'exactly 3 bedrooms' = {\"exact_beds\": 3} (exactly 3 bedrooms)\n" +
             "- 'at least 2 bedrooms' = {\"min_beds\": 2}\n" +
             "- 'under $300k' = {\"max_price\": 300000}\n" +
             "- '300k or less' = {\"max_price\": 300000}\n" +
@@ -302,7 +339,7 @@ router.post("/", async (req, res) => {
             `{
   "city": "Houston",
   "max_price": 300000,
-  "exact_beds": 3,
+  "min_beds": 3,
   "property_type": "House"
 }`
         },
@@ -320,6 +357,18 @@ router.post("/", async (req, res) => {
     console.error("❌ Failed to parse GPT filter:", err.message);
     return res.status(400).json({ error: "Invalid AI response", details: err.message });
   }
+  
+  // Update search filters with parsed data for better cache matching
+  searchFilters = {
+    ...searchFilters,
+    city: parsedFilter.location || parsedFilter.city,
+    state: 'TX', // Default
+    maxPrice: parsedFilter.max_price,
+    minBeds: parsedFilter.min_beds || parsedFilter.beds,
+    maxBeds: parsedFilter.max_beds,
+    exactBeds: parsedFilter.exact_beds || parsedFilter.bedrooms,
+    propertyType: parsedFilter.property_type
+  };
 
   // 💾 Add per-user caching for personalized search results
   const userKey = getUserKey(req);
@@ -397,7 +446,7 @@ router.post("/", async (req, res) => {
         maxPrice: max_price,
         minBedrooms: min_beds,
         propertyType: property_type === 'house' ? 'SFR' : property_type.toUpperCase(),
-        limit: 20 // Get top 20 properties from CoreLogic
+        limit: 30 // Get top 30 properties from CoreLogic to show more search power
       });
       
       coreLogicProperties = searchResult?.properties || [];
@@ -497,60 +546,31 @@ router.post("/", async (req, res) => {
   
   console.log(`📦 Found ${rawListings.length} listings (${rawListings[0]?.dataSource || 'unknown'} source)`);
 
-  // 🧠 Enhanced property data processing with comprehensive validation and fallbacks
-  let enrichedListings = [];
+  // 🚀 OPTIMIZED: Use batch processor for parallel processing instead of sequential
+  console.log(`🚀 Phase 2: Starting optimized batch processing of ${rawListings.length} properties`);
+  const batchStartTime = performance.now();
+  
+  const batchProcessor = new PropertyBatchProcessor();
+  const batchResult = await batchProcessor.processPropertiesBatch(rawListings);
+  
+  let enrichedListings = batchResult.properties;
+  const dataQualityStats = batchResult.dataQualityStats;
+  
+  const batchProcessingTime = performance.now() - batchStartTime;
+  console.log(`⚡ Batch processing completed in ${(batchProcessingTime / 1000).toFixed(2)}s`);
+  console.log(`📊 Processed ${dataQualityStats.totalProcessed} properties with ${batchResult.metrics.propertiesPerSecond.toFixed(2)} properties/second`);
+  
+  // Initialize variables for backward compatibility
   let attomSuccessCount = 0;
   let attomErrorCount = 0;
-  let dataQualityStats = {
-    totalProcessed: 0,
-    addressParsed: 0,
-    hasImages: 0,
-    hasPrice: 0,
-    hasCoordinates: 0,
-    hasBedsAndBaths: 0
-  };
   
-  console.log(`📊 Phase 2: Starting to process ${rawListings.length} listings and enhance with Zillow images`);
-  
-  // 🖼️ If we have CoreLogic properties, enhance them with Zillow images
-  if (rawListings.length > 0 && rawListings[0]?.dataSource === 'corelogic') {
-    console.log('🎨 Phase 2a: Enhancing CoreLogic properties with Zillow images...');
-    const { fetchZillowPhotos } = require('../../../services/fetchZillow');
-    
-    // Process properties to get Zillow images
-    for (const [index, property] of rawListings.slice(0, 5).entries()) {
-      try {
-        if (property.address && property.coreLogicData?.address?.zip) {
-          console.log(`🖼️ Fetching Zillow images for: ${property.address}`);
-          const zillowImages = await fetchZillowPhotos(
-            property.coreLogicData.address.street || property.address, 
-            property.coreLogicData.address.zip
-          );
-          
-          if (zillowImages && zillowImages.length > 0) {
-            property.imgSrc = zillowImages[0].imgSrc;
-            property.zpid = zillowImages[0].zpid;
-            console.log(`✅ Enhanced property ${index + 1} with Zillow image`);
-          } else {
-            console.log(`⚠️ No Zillow images found for property ${index + 1}`);
-          }
-        }
-      } catch (imageError) {
-        console.warn(`⚠️ Failed to fetch Zillow images for property ${index + 1}:`, imageError.message);
-      }
-      
-      // Add small delay to respect API rate limits
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-    
-    console.log('✅ Phase 2a completed: CoreLogic properties enhanced with Zillow images');
-  }
-  
-  for (const [index, p] of rawListings.slice(0, 10).entries()) {
+  // Skip the old sequential processing loop
+  if (false) {
+    for (const [index, p] of [].entries()) {
     dataQualityStats.totalProcessed++;
     let street, city, state, zip;
     
-    console.log(`\n🏠 Processing property ${index + 1}/${Math.min(rawListings.length, 10)}`);
+    console.log(`\n🏠 Processing property ${index + 1}/${rawListings.length}`);
     console.log(`📍 Raw property data keys:`, Object.keys(p));
     console.log(`📍 Raw address:`, p.address);
     console.log(`💰 Raw price:`, p.price);
@@ -698,45 +718,9 @@ router.post("/", async (req, res) => {
 
     console.log(`✅ Successfully parsed address: ${street}, ${city}, ${state} ${zip}`);
 
-    // Enhanced Attom lookup with better error categorization
+    // Skip Attom lookup - using CoreLogic only for faster response
     let attomData = null;
-    try {
-      console.log(`🔍 Initiating Attom lookup for: ${street}, ${city}, ${state}, ${zip}`);
-      const attomid = await getAttomId(street, city, state, zip);
-      
-      if (attomid) {
-        console.log(`✅ Found Attom ID: ${attomid}`);
-        attomData = await getPropertyDetail(attomid);
-        console.log(`✅ Successfully retrieved property details from Attom`);
-        console.log(`   Attom data keys:`, Object.keys(attomData || {}));
-        attomSuccessCount++;
-      } else {
-        console.warn(`⚠️ No Attom ID found for ${street}, ${city}, ${state}, ${zip}`);
-        console.warn(`   This may indicate the property is not in Attom's database`);
-      }
-    } catch (err) {
-      const errorMessage = err.message || String(err);
-      attomErrorCount++;
-      
-      console.error(`❌ Attom lookup failed for ${street}, ${city}, ${state}, ${zip}`);
-      console.error(`   Error type: ${err.constructor.name}`);
-      console.error(`   Error message: ${errorMessage}`);
-      
-      // Categorize and handle different error types
-      if (errorMessage.includes('Invalid Parameter')) {
-        console.error(`   🔧 Fix: Check address format and components`);
-      } else if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
-        console.error(`   ⏰ Rate limited - consider implementing exponential backoff`);
-      } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
-        console.error(`   🔑 Authentication issue - check API credentials`);
-      } else if (errorMessage.includes('timeout')) {
-        console.error(`   ⏱️ Request timeout - Attom API may be slow`);
-      } else {
-        console.error(`   ❓ Unexpected error type: ${errorMessage}`);
-      }
-      
-      console.info(`⏭️ Continuing without Attom data for this property`);
-    }
+    console.log(`⏭️ Skipping Attom lookup - using CoreLogic data only for faster processing`);
 
     // Determine property source for better frontend display
     let propertySource = {
@@ -772,7 +756,7 @@ router.post("/", async (req, res) => {
       },
       propertySource,
       attomData,
-      dataQuality: attomData ? 'excellent' : (zip ? 'good' : 'partial')
+      dataQuality: (zip && processedProperty.price && processedProperty.beds && processedProperty.baths) ? 'excellent' : (zip ? 'good' : 'partial')
     };
     
     console.log(`✅ Final enriched property:`);
@@ -786,6 +770,7 @@ router.post("/", async (req, res) => {
     console.log(`   Data Quality: ${enrichedProperty.dataQuality}`);
 
     enrichedListings.push(enrichedProperty);
+    }
   }
   
   // 🎯 Post-process filtering to ensure results match search criteria
@@ -842,7 +827,7 @@ router.post("/", async (req, res) => {
   console.log(`Properties with Prices: ${dataQualityStats.hasPrice}/${dataQualityStats.totalProcessed} (${Math.round(dataQualityStats.hasPrice/dataQualityStats.totalProcessed*100)}%)`);
   console.log(`Properties with Coordinates: ${dataQualityStats.hasCoordinates}/${dataQualityStats.totalProcessed} (${Math.round(dataQualityStats.hasCoordinates/dataQualityStats.totalProcessed*100)}%)`);
   console.log(`Properties with Bed/Bath Info: ${dataQualityStats.hasBedsAndBaths}/${dataQualityStats.totalProcessed} (${Math.round(dataQualityStats.hasBedsAndBaths/dataQualityStats.totalProcessed*100)}%)`);
-  console.log(`Attom Enrichment: ${attomSuccessCount} successful, ${attomErrorCount} failed`);
+  console.log(`CoreLogic Processing: Using CoreLogic data only for faster response times`);
   console.log(`==========================================`);
   
   // Identify and log data quality issues
@@ -853,8 +838,8 @@ router.post("/", async (req, res) => {
   const poorQuality = enrichedListings.filter(p => p.dataQuality === 'poor').length;
   
   console.log(`\n🏆 PROPERTY QUALITY BREAKDOWN:`);
-  console.log(`Excellent (with Attom data): ${excellentQuality}`);
-  console.log(`Good (complete Zillow data): ${goodQuality}`);
+  console.log(`Excellent (with complete CoreLogic data): ${excellentQuality}`);
+  console.log(`Good (complete property data): ${goodQuality}`);
   console.log(`Partial (missing some fields): ${partialQuality}`);
   console.log(`Poor (major data missing): ${poorQuality}`);
   
@@ -942,7 +927,19 @@ router.post("/", async (req, res) => {
     }
   };
 
-  console.log(`\n💾 Caching response payload with ${enrichedListings.length} properties`);
+  // 💰 Cache results in MongoDB for aggressive cost savings
+  const estimatedApiCost = rawListings.length * 0.05; // Estimate $0.05 per CoreLogic API call
+  console.log(`\n💰 Caching search results in MongoDB (estimated API cost: $${estimatedApiCost.toFixed(2)})`);
+  
+  try {
+    await SearchCache.cacheResults(query, searchFilters, responsePayload, estimatedApiCost);
+    console.log('✅ Successfully cached search results in MongoDB');
+  } catch (cacheError) {
+    console.warn('⚠️ Failed to cache results in MongoDB:', cacheError.message);
+  }
+
+  // Keep Redis cache for backwards compatibility (shorter TTL)
+  console.log(`\n💾 Also caching in Redis for short-term performance`);
   await setAsync(searchCacheKey, responsePayload, 1800); // Cache for 30 mins
 
   console.log(`\n✅ Search completed successfully. Returning ${enrichedListings.length} properties to client.`);

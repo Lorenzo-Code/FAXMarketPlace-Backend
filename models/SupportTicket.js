@@ -24,6 +24,46 @@ const commentSchema = new mongoose.Schema({
   }
 });
 
+const supportNoteSchema = new mongoose.Schema({
+  author: {
+    type: String,
+    required: true
+  },
+  content: {
+    type: String,
+    required: true
+  },
+  isPrivate: {
+    type: Boolean,
+    default: false
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+const correspondenceSchema = new mongoose.Schema({
+  direction: {
+    type: String,
+    enum: ['incoming', 'outgoing'],
+    required: true
+  },
+  content: {
+    type: String,
+    required: true
+  },
+  channel: {
+    type: String,
+    enum: ['email', 'slack', 'helpscout', 'phone', 'chat'],
+    default: 'email'
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now
+  }
+});
+
 const integrationSchema = new mongoose.Schema({
   helpScout: {
     conversationId: String,
@@ -50,7 +90,7 @@ const supportTicketSchema = new mongoose.Schema({
   ticketNumber: {
     type: String,
     unique: true,
-    required: true
+    required: false
   },
   subject: {
     type: String,
@@ -110,6 +150,8 @@ const supportTicketSchema = new mongoose.Schema({
     trim: true
   }],
   comments: [commentSchema],
+  supportNotes: [supportNoteSchema],
+  correspondence: [correspondenceSchema],
   integration: integrationSchema,
   metadata: {
     userAgent: String,
@@ -167,7 +209,6 @@ const supportTicketSchema = new mongoose.Schema({
 });
 
 // Indexes for performance
-supportTicketSchema.index({ ticketNumber: 1 });
 supportTicketSchema.index({ customerEmail: 1 });
 supportTicketSchema.index({ status: 1 });
 supportTicketSchema.index({ priority: 1 });
@@ -179,8 +220,14 @@ supportTicketSchema.index({ 'integration.slack.threadId': 1 });
 // Generate ticket number before saving
 supportTicketSchema.pre('save', async function(next) {
   if (this.isNew && !this.ticketNumber) {
-    const count = await this.constructor.countDocuments();
-    this.ticketNumber = `FCT-${String(count + 1).padStart(6, '0')}`;
+    try {
+      const count = await this.constructor.countDocuments();
+      this.ticketNumber = `FCT-${String(count + 1).padStart(6, '0')}`;
+    } catch (error) {
+      console.error('Error generating ticket number:', error);
+      // Fallback to timestamp-based number if count fails
+      this.ticketNumber = `FCT-${Date.now()}`;
+    }
   }
   
   // Update statistics
@@ -249,6 +296,16 @@ supportTicketSchema.virtual('timeAgo').get(function() {
   return `${diffDays}d ago`;
 });
 
+// Virtual for frontend compatibility
+supportTicketSchema.virtual('id').get(function() {
+  return this._id.toHexString();
+});
+
+// Ensure virtual fields are serialized
+supportTicketSchema.set('toJSON', {
+  virtuals: true
+});
+
 // Instance methods
 supportTicketSchema.methods.addComment = function(comment) {
   this.comments.push(comment);
@@ -296,6 +353,18 @@ supportTicketSchema.methods.assign = function(assignedTo, assignedById = null) {
     isInternal: true
   });
   
+  return this.save();
+};
+
+supportTicketSchema.methods.addSupportNote = function(supportNote) {
+  this.supportNotes.push(supportNote);
+  this.statistics.lastActivityAt = new Date();
+  return this.save();
+};
+
+supportTicketSchema.methods.addCorrespondence = function(correspondence) {
+  this.correspondence.push(correspondence);
+  this.statistics.lastActivityAt = new Date();
   return this.save();
 };
 

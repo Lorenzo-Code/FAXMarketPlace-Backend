@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const helpScoutService = require('../services/helpScoutService');
 const slackService = require('../services/slackService');
+const dailyWorkflowService = require('../services/dailyWorkflowService');
 const crypto = require('crypto');
 
 /**
@@ -232,6 +233,14 @@ async function handleSlashCommand(req, res) {
       // ==== ANALYTICS & REPORTS UMBRELLA ====
       case '/analytics':
         return await handleAnalyticsCommands(res, subcommand, args, { user_name, user_id });
+        
+      // ==== DAILY WORKFLOW COMMANDS ====
+      case '/kpi':
+        return await handleKPICommands(res, subcommand, args, { user_name, user_id });
+      case '/ops':
+        return await handleOpsCommands(res, subcommand, args, { user_name, user_id });
+      case '/incident':
+        return await handleIncidentCommands(res, subcommand, args, { user_name, user_id });
         
       // ==== MAIN HELP COMMAND ====
       case '/admin':
@@ -1095,6 +1104,236 @@ async function handleAnalyticsCommands(res, subcommand, args, context) {
       return res.json({
         response_type: 'ephemeral',
         text: `Unknown analytics command: ${subcommand}. Use \`/analytics help\` to see all available commands.`
+      });
+  }
+}
+
+// ==== DAILY WORKFLOW COMMANDS ====
+
+// KPI Commands
+async function handleKPICommands(res, subcommand, args, context) {
+  const { user_name } = context;
+  
+  switch (subcommand) {
+    case 'help':
+      return res.json({
+        response_type: 'ephemeral',
+        blocks: [
+          {
+            type: 'header',
+            text: {
+              type: 'plain_text',
+              text: '📊 Daily KPI Commands'
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '*📈 KPI Operations:*\n' +
+                    '• `summary` - Send daily KPI summary to #exec\n' +
+                    '• `now` - Show current KPI snapshot\n' +
+                    '• `schedule [time]` - Schedule daily KPI reports\n' +
+                    '• `alerts [threshold]` - Configure KPI alerts'
+            }
+          }
+        ]
+      });
+      
+    case 'summary':
+    case 'now':
+      try {
+        const result = await dailyWorkflowService.sendDailyKPISummary();
+        if (result.success) {
+          return res.json({
+            response_type: 'ephemeral',
+            text: '✅ Daily KPI summary sent to #exec channel!'
+          });
+        } else {
+          return res.json({
+            response_type: 'ephemeral',
+            text: `❌ Failed to send KPI summary: ${result.error}`
+          });
+        }
+      } catch (error) {
+        return res.json({
+          response_type: 'ephemeral',
+          text: `❌ Error: ${error.message}`
+        });
+      }
+      
+    default:
+      return res.json({
+        response_type: 'ephemeral',
+        text: `Unknown KPI command: ${subcommand}. Use \`/kpi help\` to see all available commands.`
+      });
+  }
+}
+
+// Ops Commands
+async function handleOpsCommands(res, subcommand, args, context) {
+  const { user_name } = context;
+  
+  switch (subcommand) {
+    case 'help':
+      return res.json({
+        response_type: 'ephemeral',
+        blocks: [
+          {
+            type: 'header',
+            text: {
+              type: 'plain_text',
+              text: '⚙️ Operations Commands'
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '*🚨 Incident Management:*\n' +
+                    '• `alert [source] [type] [details]` - Create ops incident\n' +
+                    '• `status` - Current operational status\n' +
+                    '• `health` - System health overview\n\n' +
+                    '*📊 Daily Reports:*\n' +
+                    '• `summary` - Send daily operations summary\n' +
+                    '• `closeout` - End of day review'
+            }
+          }
+        ]
+      });
+      
+    case 'alert':
+      if (args.length < 3) {
+        return res.json({
+          response_type: 'ephemeral',
+          text: '🚨 *Create Ops Alert*\n\nUsage: `/ops alert [source] [type] [details]`\n\nExample: `/ops alert Cloudflare WAF_Spike High traffic detected from suspicious IPs`'
+        });
+      }
+      
+      const source = args[0];
+      const alertType = args[1];
+      const details = args.slice(2).join(' ');
+      
+      try {
+        const result = await dailyWorkflowService.handleOpsIncident({
+          source,
+          alertType,
+          details,
+          severity: 'medium'
+        });
+        
+        if (result.success) {
+          return res.json({
+            response_type: 'ephemeral',
+            text: `✅ Ops incident created: ${result.incidentId}\n\nAlert sent to #ops channel.`
+          });
+        } else {
+          return res.json({
+            response_type: 'ephemeral',
+            text: `❌ Failed to create incident: ${result.error}`
+          });
+        }
+      } catch (error) {
+        return res.json({
+          response_type: 'ephemeral',
+          text: `❌ Error: ${error.message}`
+        });
+      }
+      
+    case 'summary':
+      try {
+        const result = await dailyWorkflowService.sendDailySummary();
+        if (result.success) {
+          return res.json({
+            response_type: 'ephemeral',
+            text: '✅ Daily operations summary sent to #exec channel!'
+          });
+        } else {
+          return res.json({
+            response_type: 'ephemeral',
+            text: `❌ Failed to send summary: ${result.error}`
+          });
+        }
+      } catch (error) {
+        return res.json({
+          response_type: 'ephemeral',
+          text: `❌ Error: ${error.message}`
+        });
+      }
+      
+    default:
+      return res.json({
+        response_type: 'ephemeral',
+        text: `Unknown ops command: ${subcommand}. Use \`/ops help\` to see all available commands.`
+      });
+  }
+}
+
+// Incident Commands
+async function handleIncidentCommands(res, subcommand, args, context) {
+  const { user_name } = context;
+  
+  switch (subcommand) {
+    case 'help':
+      return res.json({
+        response_type: 'ephemeral',
+        blocks: [
+          {
+            type: 'header',
+            text: {
+              type: 'plain_text',
+              text: '🚨 Incident Management Commands'
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '*🆘 Incident Operations:*\n' +
+                    '• `create [type] [details]` - Create new incident\n' +
+                    '• `close [incident-id] [resolution]` - Close incident\n' +
+                    '• `list [status]` - List active incidents\n' +
+                    '• `escalate [incident-id]` - Escalate incident'
+            }
+          }
+        ]
+      });
+      
+    case 'close':
+      if (args.length < 2) {
+        return res.json({
+          response_type: 'ephemeral',
+          text: '✅ *Close Incident*\n\nUsage: `/incident close [incident-id] [resolution]`\n\nExample: `/incident close incident-123456 Fixed WAF rules to reduce false positives`'
+        });
+      }
+      
+      const incidentId = args[0];
+      const resolution = args.slice(1).join(' ');
+      
+      try {
+        const result = await dailyWorkflowService.closeOpsIncident(incidentId, resolution, user_name);
+        if (result.success) {
+          return res.json({
+            response_type: 'ephemeral',
+            text: `✅ Incident ${incidentId} closed successfully!\n\nResolution: ${resolution}`
+          });
+        } else {
+          return res.json({
+            response_type: 'ephemeral',
+            text: `❌ Failed to close incident: ${result.error}`
+          });
+        }
+      } catch (error) {
+        return res.json({
+          response_type: 'ephemeral',
+          text: `❌ Error: ${error.message}`
+        });
+      }
+      
+    default:
+      return res.json({
+        response_type: 'ephemeral',
+        text: `Unknown incident command: ${subcommand}. Use \`/incident help\` to see all available commands.`
       });
   }
 }

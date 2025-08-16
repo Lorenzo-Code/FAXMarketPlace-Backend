@@ -2,6 +2,10 @@ const express = require("express");
 const { OpenAI } = require("openai");
 const router = express.Router();
 
+// Import freemium rate limiting and data limiting
+const { freemiumRateLimit, addLimitsToResponse } = require("../../../middleware/freemiumRateLimit");
+const { applyTierLimitsMiddleware } = require("../../../utils/freemiumDataLimiter");
+
 // Import existing search handlers
 const { fetchZillowPhotos } = require("../../../services/fetchZillow");
 const { getPropertyInfoFromCoreLogic } = require("../../../utils/coreLogicClientV2");
@@ -254,7 +258,7 @@ async function handleListingsSearch(query, sessionId) {
 }
 
 // Main Smart Search Endpoint
-router.post("/", async (req, res) => {
+router.post("/", freemiumRateLimit, addLimitsToResponse, applyTierLimitsMiddleware, async (req, res) => {
   const { query } = req.body;
   const sessionId = req.sessionID;
 

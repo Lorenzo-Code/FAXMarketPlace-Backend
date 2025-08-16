@@ -446,6 +446,55 @@ exports.addComment = [
 ];
 
 /**
+ * Add internal support note to support ticket
+ */
+exports.addSupportNote = [
+  body('note').notEmpty().trim().withMessage('Note is required'),
+  
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: errors.array()
+        });
+      }
+
+      const { id } = req.params;
+      const { note, isPrivate = false } = req.body;
+      const userId = req.user?.id;
+      const userName = req.user ? `${req.user.firstName} ${req.user.lastName}` : 'Admin';
+
+      const ticket = await SupportTicket.findById(id);
+      if (!ticket) {
+        return res.status(404).json({ error: 'Support ticket not found' });
+      }
+
+      const supportNote = {
+        author: userName,
+        content: note,
+        isPrivate,
+        createdAt: new Date()
+      };
+
+      await ticket.addSupportNote(supportNote);
+
+      res.json({ 
+        message: 'Support note added successfully',
+        ticket: await SupportTicket.findById(id).populate('customerUserId', 'firstName lastName email')
+      });
+    } catch (error) {
+      console.error('Error adding support note:', error);
+      res.status(500).json({ 
+        error: 'Failed to add support note',
+        details: error.message 
+      });
+    }
+  }
+];
+
+/**
  * Get support ticket statistics
  */
 exports.getStatistics = async (req, res) => {

@@ -1,6 +1,8 @@
 {
-  "name": "app",
-  "version": "0.0.0",
+  "name": "fractionax-backend",
+  "version": "1.0.0",
+  "description": "FractionaX Backend API - Real estate investment platform with comprehensive admin capabilities",
+  "main": "index.js",
   "private": true,
   "scripts": {
     "start": "node index.js",
@@ -42,6 +44,7 @@
     "multer": "^2.0.2",
     "node-2fa": "^2.0.3",
     "node-cache": "^5.1.2",
+    "node-cron": "^3.0.3",
     "node-fetch": "^2.7.0",
     "node-ipinfo": "^4.1.0",
     "openai": "^5.3.0",

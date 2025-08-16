@@ -117,6 +117,16 @@ router.put('/:id/assign', ticketController.assignTicket);
 router.post('/:id/comments', ticketController.addComment);
 
 /**
+ * @route   POST /api/admin/support-tickets/:id/notes
+ * @desc    Add an internal support note to a support ticket
+ * @access  Admin only
+ * @param   {string} id - Ticket ID
+ * @body    {string} note - Note text (required)
+ * @body    {boolean} isPrivate - Whether the note is private (default: false)
+ */
+router.post('/:id/notes', ticketController.addSupportNote);
+
+/**
  * @route   DELETE /api/admin/support-tickets/:id
  * @desc    Delete a support ticket
  * @access  Admin only

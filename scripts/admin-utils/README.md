@@ -1,3 +1,53 @@
+# Admin Utilities
+
+Command-line utilities for FractionaX Backend administration.
+
+## Available Scripts
+
+### Password Management
+
+#### `reset-password.js`
+Reset a user's password.
+
+```bash
+node scripts/admin-utils/reset-password.js user@example.com "NewPassword123!"
+```
+
+### Account Management
+
+#### `unlock-account.js`
+Unlock a locked user account.
+
+```bash
+node scripts/admin-utils/unlock-account.js user@example.com
+```
+
+#### `unlock_account.js` 
+Alternative unlock script (legacy).
+
+```bash
+node scripts/admin-utils/unlock_account.js user@example.com
+```
+
+## Usage Notes
+
+- All scripts require proper environment configuration
+- MongoDB connection must be available
+- Scripts will output success/failure status
+- Use these scripts for emergency admin operations
+
+## Security
+
+- These scripts bypass normal authentication
+- Use only for legitimate administrative purposes
+- Log all usage for audit purposes
+- Ensure secure access to server environment
+
+## Related
+
+- For regular admin operations, use the Slack Admin Bot
+- See [SLACK_SUPER_ADMIN_BOT.md](../../SLACK_SUPER_ADMIN_BOT.md) for comprehensive admin commands
+
 # Admin Utilities 🔧
 
 Command-line utilities for emergency admin operations and account management.

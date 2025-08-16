@@ -1,3 +1,112 @@
+# Test Scripts
+
+Collection of testing utilities and integration tests for FractionaX Backend.
+
+## Available Test Scripts
+
+### Integration Tests
+
+#### `test-kyc.js`
+Test KYC (Know Your Customer) integration with Sumsub.
+
+```bash
+node scripts/test-scripts/test-kyc.js
+```
+
+#### `test-slack-integration.js`
+Test Slack bot integration and webhook functionality.
+
+```bash
+node scripts/test-scripts/test-slack-integration.js
+```
+
+#### `test-local-slack.js`
+Test local Slack development setup.
+
+```bash
+node scripts/test-scripts/test-local-slack.js
+```
+
+#### `testRedis.js`
+Test Redis connection and caching functionality.
+
+```bash
+node scripts/test-scripts/testRedis.js
+```
+
+### System Tests
+
+#### `test-cache-system.js`
+Test complete caching system performance.
+
+```bash
+node scripts/test-cache-system.js
+```
+
+#### `test-global-api-integration.js`
+Test integration with external APIs (CoreLogic, Zillow, etc.).
+
+```bash
+node scripts/test-global-api-integration.js
+```
+
+#### `test-global-caching.js`
+Test global caching strategies and performance.
+
+```bash
+node scripts/test-global-caching.js
+```
+
+## Usage
+
+### Prerequisites
+- Environment variables configured (.env file)
+- MongoDB and Redis connections available
+- External API keys configured (when testing integrations)
+
+### Running Tests
+
+```bash
+# Run individual test
+node scripts/test-scripts/[script-name].js
+
+# Run all cache tests
+node scripts/test-cache-system.js
+node scripts/test-global-caching.js
+node scripts/test-scripts/testRedis.js
+
+# Run all integration tests
+node scripts/test-scripts/test-kyc.js
+node scripts/test-scripts/test-slack-integration.js
+node scripts/test-global-api-integration.js
+```
+
+## Test Categories
+
+### 1. **Caching Tests**
+- Redis connectivity
+- Cache performance
+- Global caching strategies
+- Cache invalidation
+
+### 2. **Integration Tests**
+- External API connections
+- Slack bot functionality
+- KYC service integration
+- Webhook processing
+
+### 3. **System Tests**
+- Database connectivity
+- Service availability
+- Performance benchmarks
+- Error handling
+
+## Related
+
+- Main test suites are in `/tests/` directory
+- For comprehensive testing, see [Tests README](../tests/README.md)
+- For API testing, use the endpoints in `/tests/examples/`
+
 # Test Scripts 🧪
 
 Development and testing utilities for various system components.

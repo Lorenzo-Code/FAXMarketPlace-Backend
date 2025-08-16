@@ -1,0 +1,16 @@
+{
+  "dependencies_for_batch_service": {
+    "node-cron": "^3.0.3",
+    "mongoose": "^8.0.3",
+    "node-fetch": "^2.7.0",
+    "openai": "^4.20.1"
+  },
+  "install_command": "npm install node-cron mongoose node-fetch openai",
+  "description": "Additional dependencies required for the marketplace batch service",
+  "notes": [
+    "node-cron: For scheduling daily midnight batch jobs",
+    "mongoose: For MongoDB operations and schema management", 
+    "node-fetch: For HTTP requests (if needed for external APIs)",
+    "openai: For GPT integration in batch processing"
+  ]
+}
